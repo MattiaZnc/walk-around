@@ -1,0 +1,45 @@
+# Dipendenze e build
+node_modules
+dist
+dist-ssr
+coverage
+*.local
+
+# Ambiente: i valori veri non finiscono mai nel repository.
+# Il modello committato è .env.example.
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Supabase CLI (stato locale, niente di condiviso)
+supabase/.temp
+supabase/.branches
+supabase/.env
+supabase/functions/.env
+
+# Vercel CLI
+.vercel
+
+# Cache degli strumenti
+*.tsbuildinfo
+.eslintcache
+.cache
+.vite
+
+# Log
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor / sistema operativo
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
