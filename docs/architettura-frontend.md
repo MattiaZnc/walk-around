@@ -97,3 +97,30 @@ tratta in mezzo la falserebbe. Ogni spostamento è annunciato in un `aria-live`.
   raggiungibile anche da screen reader.
 - Target touch ≥44px (`min-h-touch`), `text-base` sui campi per evitare lo
   zoom automatico di iOS Safari, un campo per riga.
+
+## Mattonelle della mappa
+
+Predefinito: **OpenStreetMap** (`tile.openstreetmap.org`), che non richiede
+chiavi. L'attribuzione è obbligatoria ed è già nel componente.
+
+Una versione precedente usava le basemap di CARTO, che hanno smesso di
+funzionare senza registrazione. Il guasto era difficile da vedere: CARTO
+risponde **HTTP 200** e restituisce un'immagine PNG che _dice_ "api key
+required". Controllare lo stato della risposta non bastava; il modo per
+accorgersene è confrontare due mattonelle di zone diverse — se sono identiche,
+non è una mappa, è un cartello.
+
+```bash
+curl -s "https://<host>/15/17521/12177.png" | sha256sum   # Roma
+curl -s "https://<host>/15/17220/11727.png" | sha256sum   # Milano
+# hash uguali = errore travestito da immagine
+```
+
+Per usare un altro servizio (CARTO o Stadia con la propria chiave, o
+un'istanza interna) bastano `VITE_MAP_TILE_URL` e
+`VITE_MAP_TILE_ATTRIBUTION`, senza toccare il codice.
+
+Il tema scuro si ottiene invertendo i colori delle mattonelle via CSS
+(`.mappa-tema-scuro`), perché OpenStreetMap non ha una variante scura. Il
+filtro è applicato al solo `leaflet-tile-pane`: marker e tracciato restano dei
+loro colori.

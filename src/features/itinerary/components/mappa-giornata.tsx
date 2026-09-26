@@ -7,7 +7,9 @@ import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-
 import { useTheme } from '@/components/layout/theme-provider';
 import type { Geometria } from '@/features/itinerary/api/percorsi.api';
 import type { Tratta } from '@/features/itinerary/lib/sequenza';
+import { configurazioneTile } from '@/features/itinerary/lib/tile-mappa';
 import { durata, km, oraBreve } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import type { Stop } from '@/types/models';
 
 type Props = {
@@ -127,7 +129,10 @@ export function MappaGiornata({ tappe, tratte, partenza, className }: Props) {
   if (tappeConCoordinate.length === 0) {
     return (
       <div
-        className={`flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-lg border bg-muted/30 p-6 text-center ${className ?? ''}`}
+        className={cn(
+          'flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-lg border bg-muted/30 p-6 text-center',
+          className,
+        )}
       >
         <MapPinOff className="size-6 text-muted-foreground" aria-hidden />
         <p className="text-sm font-medium">Nessuna tappa sulla mappa</p>
@@ -139,28 +144,25 @@ export function MappaGiornata({ tappe, tratte, partenza, className }: Props) {
     );
   }
 
-  // Tema scuro: le tile chiare accecano. CARTO offre entrambe le varianti.
-  const urlTile =
-    resolvedTheme === 'dark'
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  const tile = configurazioneTile(resolvedTheme === 'dark');
 
   return (
-    <div className={`overflow-hidden rounded-lg border ${className ?? ''}`}>
+    <div className={cn('overflow-hidden rounded-lg border', className)}>
       <MapContainer
         center={puntiPerInquadratura[0] ?? CENTRO_PREDEFINITO}
         zoom={13}
         scrollWheelZoom={false}
-        className="h-[260px] w-full sm:h-[360px] md:h-[calc(100dvh-14rem)]"
+        className={cn(
+          'h-[260px] w-full sm:h-[360px] md:h-[calc(100dvh-14rem)]',
+          // Il filtro agisce solo sulle mattonelle: marker e tracciato
+          // restano dei loro colori (vedi index.css).
+          tile.filtraPerTemaScuro && 'mappa-tema-scuro',
+        )}
         // Leaflet non è navigabile da tastiera in modo utile: il contenuto
         // informativo resta disponibile nell'elenco tappe accanto.
         aria-label="Mappa dell'itinerario"
       >
-        <TileLayer
-          url={urlTile}
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          maxZoom={19}
-        />
+        <TileLayer url={tile.url} attribution={tile.attribuzione} maxZoom={tile.maxZoom} />
 
         <AdattaVista punti={puntiPerInquadratura} />
 

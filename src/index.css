@@ -103,6 +103,33 @@
   }
 }
 
+/**
+ * Tema scuro della mappa.
+ * OpenStreetMap non ha una variante scura e i servizi che ce l'hanno chiedono
+ * una chiave, quindi i colori delle mattonelle vengono invertiti via CSS.
+ * Il filtro è applicato al solo riquadro delle mattonelle: marker numerati e
+ * tracciato del percorso restano dei loro colori.
+ */
+.mappa-tema-scuro .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.7);
+}
+
+/* Attribuzione e controlli leggibili anche sul tema scuro */
+.dark .leaflet-control-attribution {
+  background: hsl(var(--background) / 0.85);
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .leaflet-control-attribution a {
+  color: hsl(var(--primary));
+}
+
+.dark .leaflet-bar a {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border-color: hsl(var(--border));
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
