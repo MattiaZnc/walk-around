@@ -1,0 +1,11 @@
+# Roba che non serve alla build del frontend: non va caricata su Vercel.
+# Il database e le Edge Function vivono su Supabase, non qui.
+supabase
+scripts
+docs
+coverage
+
+# Test: Vercel esegue solo la build
+src/**/*.test.ts
+src/**/*.test.tsx
+src/test
