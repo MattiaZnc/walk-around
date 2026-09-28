@@ -104,6 +104,21 @@
 }
 
 /**
+ * Leaflet assegna ai propri livelli z-index fino a 700 (i pane delle
+ * mattonelle, dei tracciati, dei marker e dei popup). Senza un contesto di
+ * impilamento proprio quei valori competono con il resto della pagina, e la
+ * mappa finisce sopra elementi che devono stare davanti: il totale della
+ * giornata appoggiato in basso, la barra di navigazione, l'intestazione.
+ *
+ * `isolation: isolate` confina quei valori dentro il contenitore: da fuori la
+ * mappa vale come un unico elemento a z-index 0.
+ */
+.leaflet-container {
+  isolation: isolate;
+  z-index: 0;
+}
+
+/**
  * Tema scuro della mappa.
  * OpenStreetMap non ha una variante scura e i servizi che ce l'hanno chiedono
  * una chiave, quindi i colori delle mattonelle vengono invertiti via CSS.

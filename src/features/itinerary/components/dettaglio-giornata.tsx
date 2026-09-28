@@ -1,4 +1,4 @@
-import { AlertCircle, Copy, Flag, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { AlertCircle, Copy, Flag, MoreHorizontal, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -16,6 +16,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { PannelloResponsive } from '@/components/ui/pannello-responsive';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -350,8 +357,11 @@ export function DettaglioGiornata({ data }: { data: string }) {
 
   return (
     <div className="space-y-4 pb-24 md:pb-0">
-      {/* Azioni sulla giornata */}
-      <div className="flex flex-wrap gap-2">
+      {/* Azioni sulla giornata.
+          Solo le due più frequenti restano visibili: cinque pulsanti in fila
+          andavano a capo e quello distruttivo finiva isolato accanto alla
+          mappa, dove sembrava appartenerle. */}
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           onClick={() => {
             apriNuovaTappa();
@@ -360,16 +370,7 @@ export function DettaglioGiornata({ data }: { data: string }) {
           <Plus aria-hidden />
           Aggiungi tappa
         </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setPannello({ tipo: 'partenza' });
-          }}
-          title="Cambia il punto da cui parte la giornata"
-        >
-          <Flag aria-hidden />
-          Cambia partenza
-        </Button>
+
         <Button
           variant="outline"
           loading={ricalcola.isPending}
@@ -381,26 +382,48 @@ export function DettaglioGiornata({ data }: { data: string }) {
           <RefreshCw aria-hidden />
           Calcola km
         </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setDataInConflitto(null);
-            setDuplicaAperto(true);
-          }}
-        >
-          <Copy aria-hidden />
-          Duplica giornata
-        </Button>
-        <Button
-          variant="ghost"
-          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-          onClick={() => {
-            setConfermaEliminaGiornata(true);
-          }}
-        >
-          <Trash2 aria-hidden />
-          Elimina giornata
-        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="gap-2">
+              <MoreHorizontal aria-hidden />
+              <span className="sr-only sm:not-sr-only">Altro</span>
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem
+              onSelect={() => {
+                setPannello({ tipo: 'partenza' });
+              }}
+            >
+              <Flag aria-hidden />
+              Cambia partenza
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onSelect={() => {
+                setDataInConflitto(null);
+                setDuplicaAperto(true);
+              }}
+            >
+              <Copy aria-hidden />
+              Duplica giornata
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+              onSelect={() => {
+                setConfermaEliminaGiornata(true);
+              }}
+            >
+              <Trash2 aria-hidden />
+              Elimina giornata
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <RiepilogoGiornata totali={totali} numeroTappe={sequenza.tappe.length} />

@@ -260,6 +260,42 @@ describe('DettaglioGiornata', () => {
     expect(screen.getByText('Deposito')).toBeInTheDocument();
   });
 
+  it('tiene le azioni rare in un menu, con l’eliminazione separata', async () => {
+    const utente = userEvent.setup();
+    caricaGiornata.mockResolvedValue(giornataConDueTappe());
+
+    renderConProvider(<DettaglioGiornata data={DATA} />);
+    await screen.findByText('Deposito');
+
+    // Le due azioni frequenti restano in vista.
+    expect(screen.getByRole('button', { name: 'Aggiungi tappa' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Calcola km' })).toBeInTheDocument();
+
+    // Le altre, compresa quella distruttiva, stanno nel menu.
+    expect(screen.queryByText('Elimina giornata')).not.toBeInTheDocument();
+
+    await utente.click(screen.getByRole('button', { name: 'Altro' }));
+
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByText('Cambia partenza')).toBeInTheDocument();
+    expect(within(menu).getByText('Duplica giornata')).toBeInTheDocument();
+    expect(within(menu).getByText('Elimina giornata')).toBeInTheDocument();
+  });
+
+  it('eliminando la giornata chiede conferma', async () => {
+    const utente = userEvent.setup();
+    caricaGiornata.mockResolvedValue(giornataConDueTappe());
+
+    renderConProvider(<DettaglioGiornata data={DATA} />);
+    await screen.findByText('Deposito');
+
+    await utente.click(screen.getByRole('button', { name: 'Altro' }));
+    await utente.click(await screen.findByText('Elimina giornata'));
+
+    const dialogo = await screen.findByRole('alertdialog');
+    expect(within(dialogo).getByText('Eliminare tutta la giornata?')).toBeInTheDocument();
+  });
+
   it('mostra un errore recuperabile se il caricamento fallisce', async () => {
     caricaGiornata.mockRejectedValue(new Error('Connessione non disponibile'));
     renderConProvider(<DettaglioGiornata data={DATA} />);
