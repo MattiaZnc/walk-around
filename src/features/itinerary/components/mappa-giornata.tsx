@@ -6,7 +6,7 @@ import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from
 
 import { useTheme } from '@/components/layout/theme-provider';
 import type { Geometria } from '@/features/itinerary/api/percorsi.api';
-import type { Posizione } from '@/features/itinerary/lib/prossimita';
+import { distanzaLeggibile, type Posizione } from '@/features/itinerary/lib/prossimita';
 import { oraDiArrivo } from '@/features/itinerary/lib/prossimita-formato';
 import type { Tratta } from '@/features/itinerary/lib/sequenza';
 import { configurazioneTile } from '@/features/itinerary/lib/tile-mappa';
@@ -264,31 +264,17 @@ export function MappaGiornata({ tappe, tratte, posizione, className }: Props) {
 
       {/* Riepilogo testuale: la mappa da sola non è accessibile */}
       <ol className="sr-only">
-        {/* Posizione corrente: il cerchio rappresenta l'incertezza del
-            segnale, così si capisce quanto fidarsi del puntino. */}
         {posizione ? (
-          <>
-            <Circle
-              center={[posizione.lat, posizione.lng]}
-              radius={posizione.accuratezza}
-              pathOptions={{
-                color: '#2563eb',
-                fillColor: '#3b82f6',
-                fillOpacity: 0.15,
-                weight: 1,
-              }}
-            />
-            <Marker
-              position={[posizione.lat, posizione.lng]}
-              icon={iconaPosizione()}
-              title="La tua posizione"
-            />
-          </>
+          <li>
+            La tua posizione è nota con una precisione di circa{' '}
+            {distanzaLeggibile(posizione.accuratezza)}.
+          </li>
         ) : null}
 
         {tappeConCoordinate.map(({ tappa, numero }) => (
           <li key={tappa.id}>
             Tappa {numero}: {tappa.label}
+            {tappa.reached_at !== null ? ' (raggiunta)' : ''}
           </li>
         ))}
         {tratte.map((tratta) =>

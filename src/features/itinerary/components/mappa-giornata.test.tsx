@@ -39,6 +39,31 @@ describe('MappaGiornata', () => {
     expect(screen.getByText(/Cerca il nome del luogo/)).toBeInTheDocument();
   });
 
+  // Il caso con la posizione corrente sta in mappa-contesto.test.tsx: Leaflet
+  // vero non disegna cerchi in jsdom, quindi là react-leaflet è sostituito da un
+  // finto che verifica il vincolo del contenitore.
+  it('senza posizione il riepilogo non parla di precisione', () => {
+    renderConProvider(
+      <MappaGiornata tappe={[tappa('a', { lat: 41.89, lng: 12.49 })]} tratte={[]} />,
+    );
+
+    expect(screen.queryByText(/precisione di circa/)).not.toBeInTheDocument();
+  });
+
+  it('segnala nel riepilogo le tappe raggiunte', () => {
+    renderConProvider(
+      <MappaGiornata
+        tappe={[
+          tappa('a', { lat: 41.89, lng: 12.49 }),
+          { ...tappa('b', { lat: 41.9, lng: 12.5 }), reached_at: '2026-09-28T10:00:00Z' },
+        ]}
+        tratte={[]}
+      />,
+    );
+
+    expect(screen.getByText(/Tappa 2: b \(raggiunta\)/)).toBeInTheDocument();
+  });
+
   it('non mostra lo stato vuoto se almeno una tappa è geolocalizzata', () => {
     renderConProvider(
       <MappaGiornata tappe={[tappa('a', { lat: 41.89, lng: 12.49 })]} tratte={[]} />,
