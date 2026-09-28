@@ -1,10 +1,9 @@
-import { CalendarDays, FileText, LogOut, Route as RouteIcon, UserRound } from 'lucide-react';
+import { CalendarDays, FileText, Route as RouteIcon } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { toast } from 'sonner';
 
+import { AvvisoOffline } from '@/components/layout/avviso-offline';
+import { MenuUtente } from '@/components/layout/menu-utente';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
-import { Button } from '@/components/ui/button';
-import { useLogout } from '@/features/auth/api/use-auth-mutations';
 import { env } from '@/lib/env';
 import { cn } from '@/lib/utils';
 
@@ -14,39 +13,29 @@ type VoceNav = {
   icona: typeof CalendarDays;
 };
 
+/**
+ * Solo le destinazioni di uso quotidiano. Il profilo sta nel menu utente:
+ * ci si entra per cambiare l'indirizzo di partenza o la password, non ogni
+ * giorno, e in fondo allo schermo lo spazio è prezioso.
+ */
 const VOCI: VoceNav[] = [
   { to: '/', etichetta: 'Giorni', icona: CalendarDays },
   { to: '/report', etichetta: 'Report', icona: FileText },
-  { to: '/profilo', etichetta: 'Profilo', icona: UserRound },
 ];
-
-function BottoneLogout({ compatto = false }: { compatto?: boolean }) {
-  const logout = useLogout();
-
-  return (
-    <Button
-      variant="ghost"
-      size={compatto ? 'icon' : 'default'}
-      loading={logout.isPending}
-      onClick={() => {
-        logout.mutate(undefined, {
-          onError: (errore) => {
-            toast.error(errore.message);
-          },
-        });
-      }}
-      aria-label="Esci"
-      className={compatto ? undefined : 'w-full justify-start gap-2'}
-    >
-      <LogOut aria-hidden />
-      {compatto ? null : 'Esci'}
-    </Button>
-  );
-}
 
 export function AppLayout() {
   return (
     <div className="min-h-dvh">
+      {/* Prima voce raggiungibile con Tab: chi naviga da tastiera non deve
+          attraversare tutta la navigazione per arrivare al contenuto. */}
+      <a
+        href="#contenuto"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
+      >
+        Vai al contenuto
+      </a>
+
+      <AvvisoOffline />
       {/* Header: unico su mobile, ridotto su desktop dove c'è la sidebar */}
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
         <div className="flex h-14 items-center justify-between px-4">
@@ -56,7 +45,7 @@ export function AppLayout() {
           </span>
           <div className="flex items-center gap-1">
             <ThemeToggle />
-            <BottoneLogout compatto />
+            <MenuUtente />
           </div>
         </div>
       </header>
@@ -94,12 +83,15 @@ export function AppLayout() {
             <div className="px-1">
               <ThemeToggle />
             </div>
-            <BottoneLogout />
+            <MenuUtente etichettaVisibile />
           </div>
         </aside>
 
         {/* Contenuto: padding-bottom per non finire sotto la bottom nav */}
-        <main className="min-w-0 flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
+        <main
+          id="contenuto"
+          className="min-w-0 flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0"
+        >
           <Outlet />
         </main>
       </div>
