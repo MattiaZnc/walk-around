@@ -66,3 +66,13 @@ export function oraBreve(time: string | null): string {
   if (!time) return '';
   return time.slice(0, 5);
 }
+
+/** Es. "6 gen 2025" */
+export function dataMedia(iso: string): string {
+  return format(dataDaISO(iso), 'd MMM yyyy', { locale: it });
+}
+
+/** Es. "lunedì" */
+export function giornoSettimana(iso: string): string {
+  return format(dataDaISO(iso), 'EEEE', { locale: it });
+}

@@ -1,14 +1,282 @@
+import { endOfMonth, endOfYear, startOfMonth, startOfYear, subMonths } from 'date-fns';
+import { AlertCircle, Download, FileText } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { riepiloga } from '@/features/itinerary/api/totali.api';
+import { NESSUN_GIORNO, useTotaliPeriodo } from '@/features/itinerary/api/use-totali';
+import { RiepilogoPeriodoRiquadro } from '@/features/itinerary/components/riepilogo-periodo';
+import {
+  componiCsv,
+  descrizioneEsportazione,
+  nomeFileCsv,
+  scaricaCsv,
+} from '@/features/reports/lib/csv';
+import { dataBreve, durata, giornoSettimana, isoDaData, km } from '@/lib/format';
 import { useTitoloPagina } from '@/lib/use-titolo-pagina';
+
+type Preset = { etichetta: string; da: string; a: string };
+
+function presets(): Preset[] {
+  const adesso = new Date();
+  const mesePrecedente = subMonths(adesso, 1);
+
+  return [
+    {
+      etichetta: 'Questo mese',
+      da: isoDaData(startOfMonth(adesso)),
+      a: isoDaData(endOfMonth(adesso)),
+    },
+    {
+      etichetta: 'Mese scorso',
+      da: isoDaData(startOfMonth(mesePrecedente)),
+      a: isoDaData(endOfMonth(mesePrecedente)),
+    },
+    {
+      etichetta: 'Ultimi 3 mesi',
+      da: isoDaData(startOfMonth(subMonths(adesso, 2))),
+      a: isoDaData(endOfMonth(adesso)),
+    },
+    {
+      etichetta: "Quest'anno",
+      da: isoDaData(startOfYear(adesso)),
+      a: isoDaData(endOfYear(adesso)),
+    },
+  ];
+}
 
 export default function ReportsPage() {
   useTitoloPagina('Report');
 
+  const intervalli = useMemo(presets, []);
+  const predefinito = intervalli[0];
+  const [da, setDa] = useState(predefinito?.da ?? '');
+  const [a, setA] = useState(predefinito?.a ?? '');
+
+  const intervalloValido = da !== '' && a !== '' && da <= a;
+  const totaliQuery = useTotaliPeriodo(da, a, intervalloValido);
+  const giorni = totaliQuery.data ?? NESSUN_GIORNO;
+  const riepilogo = useMemo(() => riepiloga(giorni), [giorni]);
+
+  const esporta = () => {
+    if (giorni.length === 0) return;
+    scaricaCsv(componiCsv(giorni), nomeFileCsv(da, a));
+    toast.success('File CSV scaricato', {
+      description: descrizioneEsportazione(da, a, giorni.length),
+    });
+  };
+
   return (
-    <div className="container max-w-5xl py-6">
+    <div className="container max-w-3xl space-y-4 py-4 sm:py-6">
       <h1 className="text-2xl font-semibold tracking-tight">Report</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Totali per intervallo di date ed export CSV: in arrivo nella Fase 5.
-      </p>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Periodo</CardTitle>
+          <CardDescription>
+            Scegli l’intervallo di date: utile per i rimborsi chilometrici.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {intervalli.map((intervallo) => {
+              const attivo = intervallo.da === da && intervallo.a === a;
+              return (
+                <Button
+                  key={intervallo.etichetta}
+                  size="sm"
+                  variant={attivo ? 'default' : 'outline'}
+                  aria-pressed={attivo}
+                  onClick={() => {
+                    setDa(intervallo.da);
+                    setA(intervallo.a);
+                  }}
+                >
+                  {intervallo.etichetta}
+                </Button>
+              );
+            })}
+          </div>
+
+          {/* Un campo per riga su telefono: le date affiancate costringono a zoom */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="report-da">Dal</Label>
+              <input
+                id="report-da"
+                type="date"
+                value={da}
+                max={a || undefined}
+                onChange={(evento) => {
+                  setDa(evento.target.value);
+                }}
+                className="min-h-touch w-full rounded-md border border-input bg-background px-3 text-base sm:h-10 sm:min-h-0 sm:text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="report-a">Al</Label>
+              <input
+                id="report-a"
+                type="date"
+                value={a}
+                min={da || undefined}
+                onChange={(evento) => {
+                  setA(evento.target.value);
+                }}
+                className="min-h-touch w-full rounded-md border border-input bg-background px-3 text-base sm:h-10 sm:min-h-0 sm:text-sm"
+              />
+            </div>
+          </div>
+
+          {!intervalloValido && da !== '' && a !== '' ? (
+            <p className="text-sm text-destructive" role="alert">
+              La data iniziale deve precedere quella finale.
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {intervalloValido ? (
+        <>
+          <RiepilogoPeriodoRiquadro
+            etichetta={`Dal ${dataBreve(da)} al ${dataBreve(a)}`}
+            riepilogo={riepilogo}
+            primario
+          />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={esporta} disabled={giorni.length === 0}>
+              <Download aria-hidden />
+              Esporta CSV
+            </Button>
+            {giorni.length > 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {descrizioneEsportazione(da, a, giorni.length)}
+              </p>
+            ) : null}
+          </div>
+
+          {totaliQuery.isPending ? (
+            <div className="space-y-2" aria-busy>
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <span className="sr-only">Caricamento del report…</span>
+            </div>
+          ) : null}
+
+          {totaliQuery.isError ? (
+            <Alert variant="destructive">
+              <AlertCircle aria-hidden />
+              <AlertTitle>Impossibile caricare il report</AlertTitle>
+              <AlertDescription className="space-y-3">
+                <p>{totaliQuery.error.message}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    void totaliQuery.refetch();
+                  }}
+                >
+                  Riprova
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {totaliQuery.isSuccess && giorni.length === 0 ? (
+            <Card>
+              <CardContent className="space-y-2 py-8 text-center">
+                <FileText className="mx-auto size-8 text-muted-foreground" aria-hidden />
+                <p className="font-medium">Nessuna giornata nel periodo scelto</p>
+                <p className="text-sm text-muted-foreground">Prova con un intervallo più ampio.</p>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {giorni.length > 0 ? (
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-sm">
+                <caption className="sr-only">
+                  Chilometri per giornata dal {dataBreve(da)} al {dataBreve(a)}
+                </caption>
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th scope="col" className="px-3 py-2 text-left font-medium">
+                      Giorno
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-left font-medium">
+                      Mezzo
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                      Tappe
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                      Durata
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                      Km
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...giorni]
+                    .sort((primo, secondo) => primo.data.localeCompare(secondo.data))
+                    .map((giorno) => (
+                      <tr key={giorno.itineraryId} className="border-t">
+                        <td className="px-3 py-2">
+                          <Link
+                            to={`/day/${giorno.data}`}
+                            className="font-medium underline-offset-4 hover:underline"
+                          >
+                            {dataBreve(giorno.data)}
+                          </Link>
+                          <span className="ml-2 text-xs capitalize text-muted-foreground">
+                            {giornoSettimana(giorno.data)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {giorno.modalita === 'piedi' ? 'a piedi' : 'in auto'}
+                        </td>
+                        <td className="tabular px-3 py-2 text-right">{giorno.tappe}</td>
+                        <td className="tabular px-3 py-2 text-right text-muted-foreground">
+                          {giorno.minuti > 0 ? durata(giorno.minuti) : '—'}
+                        </td>
+                        <td className="tabular px-3 py-2 text-right font-medium">
+                          {km(giorno.km)}
+                          {giorno.tratteStimate > 0 ? (
+                            <Badge variant="warning" className="ml-2">
+                              stim.
+                            </Badge>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+                <tfoot className="border-t-2 bg-muted/30 font-semibold">
+                  <tr>
+                    <td className="px-3 py-2" colSpan={2}>
+                      Totale
+                    </td>
+                    <td className="tabular px-3 py-2 text-right">{riepilogo.tappe}</td>
+                    <td className="tabular px-3 py-2 text-right">
+                      {riepilogo.minuti > 0 ? durata(riepilogo.minuti) : '—'}
+                    </td>
+                    <td className="tabular px-3 py-2 text-right">{km(riepilogo.km)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }
