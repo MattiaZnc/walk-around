@@ -47,12 +47,12 @@ export function MenuUtente({ etichettaVisibile = false }: { etichettaVisibile?: 
           </>
         ) : null}
 
-        <DropdownMenuItem asChild>
+        {/*<DropdownMenuItem asChild>
           <Link to="/profilo">
             <UserRound aria-hidden />
             Profilo
           </Link>
-        </DropdownMenuItem>
+        </DropdownMenuItem> */}
 
         <DropdownMenuSeparator />
 
