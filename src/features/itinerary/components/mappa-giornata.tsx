@@ -15,8 +15,6 @@ import type { Stop } from '@/types/models';
 type Props = {
   tappe: Stop[];
   tratte: Tratta[];
-  /** Punto di partenza del profilo: destinazione della tratta di rientro. */
-  partenza: { indirizzo: string; lat: number; lng: number } | null;
   className?: string;
 };
 
@@ -27,19 +25,21 @@ const CENTRO_PREDEFINITO: [number, number] = [41.9028, 12.4964];
  * Marker numerato disegnato come HTML: un'icona immagine per ogni numero
  * richiederebbe file separati, e i `divIcon` restano nitidi su schermi retina.
  */
-function iconaNumerata(numero: number, tipo: 'tappa' | 'rientro'): L.DivIcon {
-  const colore = tipo === 'rientro' ? 'hsl(var(--muted-foreground))' : 'hsl(var(--primary))';
-  const contenuto = tipo === 'rientro' ? '⌂' : String(numero);
+function iconaNumerata(numero: number, partenza: boolean): L.DivIcon {
+  // La partenza si distingue a colpo d'occhio: è il punto da cui si misurano
+  // i chilometri, non una tappa qualsiasi.
+  const colore = partenza ? 'hsl(var(--foreground))' : 'hsl(var(--primary))';
+  const contenuto = String(numero);
 
   return L.divIcon({
     className: 'marker-tappa',
     html: `<span style="
       display:flex;align-items:center;justify-content:center;
       width:28px;height:28px;border-radius:9999px;
-      background:${colore};color:hsl(var(--primary-foreground));
+      background:${colore};color:hsl(var(--background));
       font:600 13px/1 system-ui,sans-serif;
       box-shadow:0 1px 4px rgb(0 0 0 / .4);
-      border:2px solid hsl(var(--background));
+      border:${partenza ? '3px solid hsl(var(--primary))' : '2px solid hsl(var(--background))'};
     ">${contenuto}</span>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
@@ -80,7 +80,7 @@ function AdattaVista({ punti }: { punti: [number, number][] }) {
   return null;
 }
 
-export function MappaGiornata({ tappe, tratte, partenza, className }: Props) {
+export function MappaGiornata({ tappe, tratte, className }: Props) {
   const { resolvedTheme } = useTheme();
 
   const tappeConCoordinate = tappe
@@ -104,8 +104,8 @@ export function MappaGiornata({ tappe, tratte, partenza, className }: Props) {
       // Senza geometria si collega comunque i due estremi, se noti: dà il senso
       // del giro anche quando il provider non ha restituito il tracciato.
       const da = tratta.fromStop;
-      const a = tratta.rientro ? partenza : tratta.toStop;
-      if (da.lat === null || da.lng === null || !a || a.lat === null || a.lng === null) return null;
+      const a = tratta.toStop;
+      if (da.lat === null || da.lng === null || a.lat === null || a.lng === null) return null;
 
       return {
         chiave: tratta.chiave,
@@ -185,13 +185,16 @@ export function MappaGiornata({ tappe, tratte, partenza, className }: Props) {
           <Marker
             key={tappa.id}
             position={[tappa.lat, tappa.lng]}
-            icon={iconaNumerata(numero, 'tappa')}
-            title={`${numero}. ${tappa.label}`}
+            icon={iconaNumerata(numero, tappa.is_start)}
+            title={`${numero}. ${tappa.label}${tappa.is_start ? ' (partenza)' : ''}`}
           >
             <Popup>
               <p className="font-semibold">
                 {numero}. {tappa.label}
               </p>
+              {tappa.is_start ? (
+                <p className="text-xs font-medium">Punto di partenza della giornata</p>
+              ) : null}
               {tappa.address ? <p className="text-xs">{tappa.address}</p> : null}
               {tappa.planned_time ? (
                 <p className="text-xs">Orario previsto: {oraBreve(tappa.planned_time)}</p>
@@ -199,19 +202,6 @@ export function MappaGiornata({ tappe, tratte, partenza, className }: Props) {
             </Popup>
           </Marker>
         ))}
-
-        {partenza ? (
-          <Marker
-            position={[partenza.lat, partenza.lng]}
-            icon={iconaNumerata(0, 'rientro')}
-            title={`Punto di partenza: ${partenza.indirizzo}`}
-          >
-            <Popup>
-              <p className="font-semibold">Punto di partenza</p>
-              <p className="text-xs">{partenza.indirizzo}</p>
-            </Popup>
-          </Marker>
-        ) : null}
       </MapContainer>
 
       {/* Riepilogo testuale: la mappa da sola non è accessibile */}
@@ -224,9 +214,8 @@ export function MappaGiornata({ tappe, tratte, partenza, className }: Props) {
         {tratte.map((tratta) =>
           tratta.leg ? (
             <li key={tratta.chiave}>
-              Tratta da {tratta.fromStop.label} a{' '}
-              {tratta.rientro ? 'punto di partenza' : (tratta.toStop?.label ?? '')}:{' '}
-              {km(tratta.leg.distance_km)}, {durata(tratta.leg.duration_min)}
+              {tratta.rientro ? 'Rientro' : 'Tratta'} da {tratta.fromStop.label} a{' '}
+              {tratta.toStop.label}: {km(tratta.leg.distance_km)}, {durata(tratta.leg.duration_min)}
             </li>
           ) : null,
         )}

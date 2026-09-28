@@ -18,6 +18,7 @@ function tappa(id: string, coordinate: { lat: number; lng: number } | null): Sto
     lng: coordinate?.lng ?? null,
     planned_time: null,
     notes: null,
+    is_start: false,
     created_at: ADESSO,
     updated_at: ADESSO,
   };
@@ -58,7 +59,7 @@ function tratta(extra: Partial<Tratta> = {}): Tratta {
 
 describe('tratteDaCalcolare', () => {
   it('include le tratte con entrambe le coordinate', () => {
-    const { calcolabili, nonCalcolabili } = tratteDaCalcolare([tratta()], null, true);
+    const { calcolabili, nonCalcolabili } = tratteDaCalcolare([tratta()], true);
 
     expect(calcolabili).toHaveLength(1);
     expect(calcolabili[0]?.from).toEqual(COLOSSEO);
@@ -67,49 +68,42 @@ describe('tratteDaCalcolare', () => {
   });
 
   it('non tocca mai le tratte inserite a mano', () => {
-    const { calcolabili } = tratteDaCalcolare(
-      [tratta({ leg: leg({ source: 'manual' }) })],
-      null,
-      false,
-    );
+    const { calcolabili } = tratteDaCalcolare([tratta({ leg: leg({ source: 'manual' }) })], false);
     expect(calcolabili).toHaveLength(0);
   });
 
   it('con soloMancanti salta le tratte già calcolate', () => {
     const tratte = [tratta({ chiave: 'a->b', leg: leg() }), tratta({ chiave: 'b->c', leg: null })];
 
-    expect(tratteDaCalcolare(tratte, null, true).calcolabili.map((t) => t.chiave)).toEqual([
-      'b->c',
-    ]);
+    expect(tratteDaCalcolare(tratte, true).calcolabili.map((t) => t.chiave)).toEqual(['b->c']);
     // Ricalcolo completo: entrambe, perché nessuna delle due è manuale.
-    expect(tratteDaCalcolare(tratte, null, false).calcolabili).toHaveLength(2);
+    expect(tratteDaCalcolare(tratte, false).calcolabili).toHaveLength(2);
   });
 
   it('conta come non calcolabile una tratta con una tappa senza coordinate', () => {
     const { calcolabili, nonCalcolabili } = tratteDaCalcolare(
       [tratta({ toStop: tappa('b', null) })],
-      null,
       true,
     );
     expect(calcolabili).toHaveLength(0);
     expect(nonCalcolabili).toBe(1);
   });
 
-  it('per il rientro usa le coordinate del punto di partenza', () => {
+  it('il rientro è una tratta come le altre: arriva alla tappa di partenza', () => {
+    const arrivo = tappa('partenza', PARTENZA);
     const { calcolabili } = tratteDaCalcolare(
-      [tratta({ chiave: 'b->rientro', toStop: null, rientro: true })],
-      PARTENZA,
+      [tratta({ chiave: 'b->rientro-partenza', toStop: arrivo, rientro: true })],
       true,
     );
+
     expect(calcolabili).toHaveLength(1);
     expect(calcolabili[0]?.to).toEqual(PARTENZA);
-    expect(calcolabili[0]?.toStopId).toBeNull();
+    expect(calcolabili[0]?.toStopId).toBe('partenza');
   });
 
-  it('senza punto di partenza il rientro non è calcolabile', () => {
+  it('il rientro verso una partenza senza coordinate non è calcolabile', () => {
     const { calcolabili, nonCalcolabili } = tratteDaCalcolare(
-      [tratta({ chiave: 'b->rientro', toStop: null, rientro: true })],
-      null,
+      [tratta({ chiave: 'b->rientro', toStop: tappa('partenza', null), rientro: true })],
       true,
     );
     expect(calcolabili).toHaveLength(0);
@@ -117,16 +111,12 @@ describe('tratteDaCalcolare', () => {
   });
 
   it('conserva l’id della tratta esistente, per aggiornarla invece di duplicarla', () => {
-    const { calcolabili } = tratteDaCalcolare(
-      [tratta({ leg: leg({ id: 'esistente' }) })],
-      null,
-      false,
-    );
+    const { calcolabili } = tratteDaCalcolare([tratta({ leg: leg({ id: 'esistente' }) })], false);
     expect(calcolabili[0]?.legId).toBe('esistente');
   });
 
   it('su un elenco vuoto non produce nulla', () => {
-    const { calcolabili, nonCalcolabili } = tratteDaCalcolare([], null, true);
+    const { calcolabili, nonCalcolabili } = tratteDaCalcolare([], true);
     expect(calcolabili).toHaveLength(0);
     expect(nonCalcolabili).toBe(0);
   });

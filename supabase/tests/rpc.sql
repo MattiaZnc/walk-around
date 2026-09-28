@@ -220,14 +220,20 @@ begin
   insert into public.itineraries (date, returns_to_start)
   values ('2026-05-08', true) returning id into v_giornata;
 
-  v_a := (public.insert_stop_at(v_giornata, 'Sede')).id;
+  -- La partenza è una tappa marcata con is_start.
+  v_a := (public.insert_stop_at(v_giornata, 'Sede', null, null, null, null, null, null, true)).id;
   v_b := (public.insert_stop_at(v_giornata, 'Cantiere')).id;
+
+  assert (select s.is_start from public.stops s where s.id = v_a),
+    'FALLITO: il flag di partenza non è stato salvato';
+  assert (select s.position from public.stops s where s.id = v_a) = 1,
+    'FALLITO: la partenza non è in prima posizione';
 
   insert into public.legs (itinerary_id, from_stop_id, to_stop_id, distance_km, duration_min)
   values (v_giornata, v_a, v_b, 12.30, 25);
-  -- Rientro: dall'ultima tappa al punto di partenza (to_stop_id null).
+  -- Rientro: dall'ultima tappa alla tappa di partenza.
   insert into public.legs (itinerary_id, from_stop_id, to_stop_id, distance_km, duration_min, source)
-  values (v_giornata, v_b, null, 11.70, 22, 'manual');
+  values (v_giornata, v_b, v_a, 11.70, 22, 'manual');
 
   v_invalidate := public.invalida_tratte_non_adiacenti(v_giornata);
   assert v_invalidate = 0, 'FALLITO: la tratta di rientro è stata invalidata per errore';
@@ -245,17 +251,97 @@ begin
           where t.itinerary_id = v_giornata) = 1,
     'FALLITO: conteggio tratte manuali errato';
 
-  -- Invertendo l'ordine, il rientro deve ripartire dalla nuova ultima tappa:
-  -- la tratta di rientro vecchia (da Cantiere) non è più valida.
+  assert (select has_start from public.itinerary_totals t where t.itinerary_id = v_giornata),
+    'FALLITO: la vista non segnala la presenza della partenza';
+
+  -- Con due tappe e rientro il giro è un anello: invertendole le coppie
+  -- richieste restano (b,a) e (a,b), cioè esattamente le tratte esistenti.
+  -- Nessuna invalidazione è la risposta giusta.
   v_invalidate := public.reorder_stops(v_giornata, array[v_b, v_a]);
-  assert v_invalidate = 2,
-    format('FALLITO: attese 2 invalidazioni dopo l''inversione, ottenute %s', v_invalidate);
-  assert (select total_km from public.itinerary_totals t where t.itinerary_id = v_giornata) = 0,
-    'FALLITO: i totali non tornano a zero dopo l''invalidazione';
+  assert v_invalidate = 0,
+    format('FALLITO: un anello di due tappe non va invalidato, ottenute %s', v_invalidate);
+  assert (select total_km from public.itinerary_totals t where t.itinerary_id = v_giornata) = 24.00,
+    'FALLITO: i totali non dovevano cambiare';
 
   -- Giornata senza tratte: la vista deve comunque restituire una riga a zero.
   assert (select count(*) from public.itinerary_totals t where t.itinerary_id = v_giornata) = 1,
     'FALLITO: la vista perde le giornate senza tratte';
+end $$;
+
+-- Con tre tappe e rientro, spostare una tappa cambia davvero le coppie.
+do $$
+declare
+  v_giornata uuid;
+  v_p uuid;
+  v_x uuid;
+  v_y uuid;
+  v_invalidate integer;
+begin
+  insert into public.itineraries (date, returns_to_start)
+  values ('2026-05-11', true) returning id into v_giornata;
+
+  v_p := (public.insert_stop_at(v_giornata, 'Partenza', null, null, null, null, null, null, true)).id;
+  v_x := (public.insert_stop_at(v_giornata, 'X')).id;
+  v_y := (public.insert_stop_at(v_giornata, 'Y')).id;
+
+  -- Anello completo: P→X, X→Y, Y→P (rientro).
+  insert into public.legs (itinerary_id, from_stop_id, to_stop_id, distance_km)
+  values (v_giornata, v_p, v_x, 3), (v_giornata, v_x, v_y, 4), (v_giornata, v_y, v_p, 5);
+
+  assert public.invalida_tratte_non_adiacenti(v_giornata) = 0,
+    'FALLITO: un anello completo di tre tappe è stato invalidato';
+  assert (select total_km from public.itinerary_totals t where t.itinerary_id = v_giornata) = 12.00,
+    'FALLITO: totale errato sull''anello di tre tappe';
+
+  -- Scambiando X e Y: le coppie diventano P→Y, Y→X, X→P. Nessuna delle tre
+  -- tratte precedenti sopravvive.
+  v_invalidate := public.reorder_stops(v_giornata, array[v_p, v_y, v_x]);
+  assert v_invalidate = 3,
+    format('FALLITO: attese 3 invalidazioni, ottenute %s', v_invalidate);
+  assert (select count(*) from public.legs l where l.itinerary_id = v_giornata) = 0,
+    'FALLITO: tratte non valide sopravvissute al riordino';
+end $$;
+
+-- Con una sola tappa non esiste rientro: sarebbe una tratta da A ad A.
+do $$
+declare
+  v_giornata uuid;
+  v_sola uuid;
+begin
+  insert into public.itineraries (date, returns_to_start)
+  values ('2026-05-09', true) returning id into v_giornata;
+  v_sola := (public.insert_stop_at(v_giornata, 'Unica', null, null, null, null, null, null, true)).id;
+
+  begin
+    insert into public.legs (itinerary_id, from_stop_id, to_stop_id, distance_km)
+    values (v_giornata, v_sola, v_sola, 5);
+    raise exception 'FALLITO: accettata una tratta da una tappa a se stessa';
+  exception when check_violation then null; end;
+
+  assert public.invalida_tratte_non_adiacenti(v_giornata) = 0,
+    'FALLITO: invalidazione inattesa su una giornata con una sola tappa';
+end $$;
+
+-- Una seconda partenza sposta il flag, non lo duplica.
+do $$
+declare
+  v_giornata uuid;
+  v_prima uuid;
+  v_seconda uuid;
+begin
+  insert into public.itineraries (date) values ('2026-05-10') returning id into v_giornata;
+  v_prima := (public.insert_stop_at(v_giornata, 'Casa', null, null, null, null, null, null, true)).id;
+  v_seconda := (public.insert_stop_at(v_giornata, 'Ufficio', null, null, null, null, null, null, true)).id;
+
+  assert (select count(*) from public.stops s
+          where s.itinerary_id = v_giornata and s.is_start) = 1,
+    'FALLITO: due tappe marcate come partenza';
+  assert (select s.is_start from public.stops s where s.id = v_seconda),
+    'FALLITO: la nuova partenza non ha il flag';
+  assert not (select s.is_start from public.stops s where s.id = v_prima),
+    'FALLITO: la vecchia partenza ha mantenuto il flag';
+  assert (select s.position from public.stops s where s.id = v_seconda) = 1,
+    'FALLITO: la nuova partenza non è in prima posizione';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -271,7 +357,7 @@ begin
   insert into public.itineraries (date, notes, returns_to_start)
   values ('2026-06-01', 'Giro settimanale', true) returning id into v_origine;
 
-  v_a := (public.insert_stop_at(v_origine, 'Deposito', 'Via Roma 1', 45.4642, 9.1896, '08:30', 'Ritiro merce')).id;
+  v_a := (public.insert_stop_at(v_origine, 'Deposito', 'Via Roma 1', 45.4642, 9.1896, '08:30', 'Ritiro merce', null, true)).id;
   v_b := (public.insert_stop_at(v_origine, 'Cliente', 'Via Po 9', 45.0703, 7.6869)).id;
 
   insert into public.legs (itinerary_id, from_stop_id, to_stop_id, distance_km)
@@ -291,6 +377,9 @@ begin
   assert (select s.planned_time from public.stops s
           where s.itinerary_id = v_copia.id and s.position = 1) = '08:30',
     'FALLITO: orario previsto non copiato';
+  assert (select s.is_start from public.stops s
+          where s.itinerary_id = v_copia.id and s.position = 1),
+    'FALLITO: flag di partenza non copiato';
   -- Le tratte NON vengono copiate: i km vanno ricalcolati.
   assert (select count(*) from public.legs l where l.itinerary_id = v_copia.id) = 0,
     'FALLITO: le tratte non devono essere copiate';
@@ -388,14 +477,25 @@ begin
     raise exception 'FALLITO: accettata una tratta con partenza e arrivo uguali';
   exception when check_violation then null; end;
 
+  -- Una tratta senza uno dei due estremi non è più ammessa: il rientro punta
+  -- alla tappa di partenza, quindi entrambi gli estremi esistono sempre.
+  begin
+    insert into public.legs (itinerary_id, from_stop_id, to_stop_id, distance_km)
+    values (v_giornata, v_a, null, 4);
+    raise exception 'FALLITO: accettata una tratta senza tappa di arrivo';
+  exception when check_violation then null; end;
+
   -- Due tratte in uscita dalla stessa tappa
   insert into public.legs (itinerary_id, from_stop_id, to_stop_id, distance_km)
   values (v_giornata, v_a, v_b, 4);
   begin
     insert into public.legs (itinerary_id, from_stop_id, to_stop_id, distance_km)
-    values (v_giornata, v_a, null, 4);
+    values (v_giornata, v_a, v_estranea, 4);
     raise exception 'FALLITO: accettate due tratte in uscita dalla stessa tappa';
-  exception when unique_violation then null; end;
+  exception
+    when unique_violation then null;
+    when check_violation then null; -- il trigger sugli estremi può precedere l'indice
+  end;
 
   -- Due giornate con la stessa data per lo stesso utente
   begin
@@ -416,3 +516,64 @@ end $$;
 rollback;
 
 \echo 'OK — test RPC e vincoli superati'
+
+-- ---------------------------------------------------------------------------
+-- Modalità di viaggio: solo auto e piedi
+-- ---------------------------------------------------------------------------
+begin;
+
+insert into auth.users (
+  id, instance_id, aud, role, email, encrypted_password,
+  email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data
+)
+values (
+  '44444444-4444-4444-4444-444444444444', '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated', 'mezzi@esempio.it',
+  '$2a$10$hashfittiziosolopertest444444444444444444444', now(), now(), now(),
+  '{"provider":"email","providers":["email"]}', '{"full_name":"Mezzi"}'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}';
+
+do $$
+declare
+  v_giornata uuid;
+  v_a uuid;
+  v_b uuid;
+begin
+  insert into public.itineraries (date) values ('2026-08-01') returning id into v_giornata;
+
+  assert (select i.travel_mode from public.itineraries i where i.id = v_giornata) = 'auto',
+    'FALLITO: il mezzo predefinito non è auto';
+
+  update public.itineraries i set travel_mode = 'piedi' where i.id = v_giornata;
+  assert (select i.travel_mode from public.itineraries i where i.id = v_giornata) = 'piedi',
+    'FALLITO: non è possibile passare ad a piedi';
+
+  begin
+    update public.itineraries i set travel_mode = 'bici' where i.id = v_giornata;
+    raise exception 'FALLITO: accettata una modalità non prevista';
+  exception when check_violation then null; end;
+
+  -- Cambiando mezzo le tratte automatiche vanno rifatte, quelle manuali restano.
+  v_a := (public.insert_stop_at(v_giornata, 'A', null, null, null, null, null, null, true)).id;
+  v_b := (public.insert_stop_at(v_giornata, 'B')).id;
+  insert into public.legs (itinerary_id, from_stop_id, to_stop_id, distance_km, source)
+  values (v_giornata, v_a, v_b, 9.99, 'auto');
+
+  update public.itineraries i set travel_mode = 'auto' where i.id = v_giornata;
+  assert (select count(*) from public.legs l where l.itinerary_id = v_giornata) = 0,
+    'FALLITO: le tratte automatiche non sono state invalidate al cambio di mezzo';
+
+  insert into public.legs (itinerary_id, from_stop_id, to_stop_id, distance_km, source)
+  values (v_giornata, v_a, v_b, 7.77, 'manual');
+  update public.itineraries i set travel_mode = 'piedi' where i.id = v_giornata;
+  assert (select count(*) from public.legs l
+          where l.itinerary_id = v_giornata and l.source = 'manual') = 1,
+    'FALLITO: una tratta manuale è stata eliminata al cambio di mezzo';
+end $$;
+
+rollback;
+
+\echo 'OK — test modalità di viaggio superati'

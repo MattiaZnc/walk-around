@@ -19,6 +19,7 @@ function tappa(id: string, coordinate: { lat: number; lng: number } | null): Sto
     lng: coordinate?.lng ?? null,
     planned_time: null,
     notes: null,
+    is_start: false,
     created_at: ADESSO,
     updated_at: ADESSO,
   };
@@ -31,9 +32,7 @@ function tappa(id: string, coordinate: { lat: number; lng: number } | null): Sto
  */
 describe('MappaGiornata', () => {
   it('senza coordinate spiega come ottenerle invece di mostrare una mappa vuota', () => {
-    renderConProvider(
-      <MappaGiornata tappe={[tappa('a', null), tappa('b', null)]} tratte={[]} partenza={null} />,
-    );
+    renderConProvider(<MappaGiornata tappe={[tappa('a', null), tappa('b', null)]} tratte={[]} />);
 
     expect(screen.getByText('Nessuna tappa sulla mappa')).toBeInTheDocument();
     expect(screen.getByText(/Cerca il nome del luogo/)).toBeInTheDocument();
@@ -41,11 +40,7 @@ describe('MappaGiornata', () => {
 
   it('non mostra lo stato vuoto se almeno una tappa è geolocalizzata', () => {
     renderConProvider(
-      <MappaGiornata
-        tappe={[tappa('a', { lat: 41.89, lng: 12.49 })]}
-        tratte={[]}
-        partenza={null}
-      />,
+      <MappaGiornata tappe={[tappa('a', { lat: 41.89, lng: 12.49 })]} tratte={[]} />,
     );
 
     expect(screen.queryByText('Nessuna tappa sulla mappa')).not.toBeInTheDocument();

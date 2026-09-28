@@ -15,16 +15,19 @@ export type Geometria = {
   coordinates: [number, number][];
 };
 
-export type ModalitaViaggio = 'auto' | 'piedi' | 'bici';
+/**
+ * Mezzi previsti dall'app. La Edge Function conosce anche la bicicletta, ma
+ * qui non serve: il vincolo sul database ammette solo questi due valori.
+ */
+export type ModalitaViaggio = 'auto' | 'piedi';
 
 export const MODALITA: { valore: ModalitaViaggio; etichetta: string }[] = [
   { valore: 'auto', etichetta: 'In auto' },
   { valore: 'piedi', etichetta: 'A piedi' },
-  { valore: 'bici', etichetta: 'In bici' },
 ];
 
 export function modalitaValida(valore: string): ModalitaViaggio {
-  return valore === 'piedi' || valore === 'bici' ? valore : 'auto';
+  return valore === 'piedi' ? 'piedi' : 'auto';
 }
 
 export type Tratto = {

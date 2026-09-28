@@ -73,6 +73,7 @@ function tappa(id: string, label: string, position: number): Stop {
     lng: 9.1,
     planned_time: null,
     notes: null,
+    is_start: false,
     created_at: ADESSO,
     updated_at: ADESSO,
   };
@@ -121,14 +122,38 @@ describe('DettaglioGiornata', () => {
     vi.clearAllMocks();
   });
 
-  it('mostra lo stato vuoto con la scorciatoia al punto di partenza del profilo', async () => {
+  it('su una giornata vuota chiede prima da dove si parte', async () => {
     caricaGiornata.mockResolvedValue(null);
     renderConProvider(<DettaglioGiornata data={DATA} />);
 
-    expect(await screen.findByText('Nessuna tappa per questo giorno')).toBeInTheDocument();
+    expect(await screen.findByText('Da dove parti?')).toBeInTheDocument();
+    // Scorciatoia con l'indirizzo del profilo.
     expect(
-      screen.getByRole('button', { name: 'Parti da Via Torino 5, Milano' }),
+      screen.getByRole('button', { name: /Parti da Via Torino 5, Milano/ }),
     ).toBeInTheDocument();
+    // La ricerca permette di scegliere un punto diverso.
+    expect(screen.getByLabelText('Cerca il luogo')).toBeInTheDocument();
+  });
+
+  it('salva la partenza come prima tappa marcata is_start', async () => {
+    const utente = userEvent.setup();
+    caricaGiornata.mockResolvedValue(null);
+    assicuraGiornata.mockResolvedValue({ id: 'g1' });
+    aggiungiTappa.mockResolvedValue({ id: 's1' });
+
+    renderConProvider(<DettaglioGiornata data={DATA} />);
+    await screen.findByText('Da dove parti?');
+
+    await utente.click(screen.getByRole('button', { name: /Parti da Via Torino 5, Milano/ }));
+
+    await waitFor(() => {
+      expect(aggiungiTappa).toHaveBeenCalled();
+    });
+    const argomenti = aggiungiTappa.mock.calls[0] ?? [];
+    expect(argomenti[0]).toBe('g1');
+    expect(argomenti[1]).toMatchObject({ address: 'Via Torino 5, Milano' });
+    // Quarto argomento: il flag di partenza.
+    expect(argomenti[3]).toBe(true);
   });
 
   it('elenca le tappe numerate con il totale della giornata', async () => {
@@ -252,9 +277,10 @@ describe('DettaglioGiornata', () => {
     renderConProvider(<DettaglioGiornata data={DATA} />);
     await screen.findByText('Deposito');
 
+    // Il rientro torna alla prima tappa, cioè al punto di partenza.
     expect(
       screen.getByRole('button', {
-        name: /Modifica i chilometri della tratta da Cliente a Via Torino 5, Milano/,
+        name: /Modifica i chilometri della tratta da Cliente a Deposito/,
       }),
     ).toBeInTheDocument();
   });

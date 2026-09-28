@@ -26,8 +26,6 @@ import { cn } from '@/lib/utils';
 
 type Props = {
   tratta: Tratta;
-  /** Indirizzo di rientro mostrato al posto del nome della tappa di arrivo. */
-  indirizzoRientro?: string | null;
   inCorso: boolean;
   onSalva: (valori: TrattaInput) => void;
   onAzzera: () => void;
@@ -38,7 +36,7 @@ type Props = {
  * Quando la riga `legs` non esiste la tratta resta comunque modificabile: un
  * indirizzo senza coordinate o un errore dell'API non devono bloccare l'utente.
  */
-export function TrattaInline({ tratta, indirizzoRientro, inCorso, onSalva, onAzzera }: Props) {
+export function TrattaInline({ tratta, inCorso, onSalva, onAzzera }: Props) {
   const [inModifica, setInModifica] = React.useState(false);
   const { leg } = tratta;
 
@@ -60,10 +58,8 @@ export function TrattaInline({ tratta, indirizzoRientro, inCorso, onSalva, onAzz
     }
   }, [leg?.distance_km, leg?.duration_min, inModifica, form]);
 
-  const destinazione = tratta.rientro
-    ? (indirizzoRientro ?? 'punto di partenza')
-    : (tratta.toStop?.label ?? 'tappa successiva');
-  const descrizione = `da ${tratta.fromStop.label} a ${destinazione}`;
+  // Il rientro torna alla tappa di partenza: l'arrivo esiste sempre.
+  const descrizione = `da ${tratta.fromStop.label} a ${tratta.toStop.label}`;
 
   if (inModifica) {
     return (
@@ -77,7 +73,9 @@ export function TrattaInline({ tratta, indirizzoRientro, inCorso, onSalva, onAzz
             className="rounded-md border bg-card p-3"
             noValidate
           >
-            <p className="mb-3 text-xs text-muted-foreground">Tratta {descrizione}</p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              {tratta.rientro ? 'Rientro' : 'Tratta'} {descrizione}
+            </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
               <FormField
                 control={form.control}
@@ -164,7 +162,15 @@ export function TrattaInline({ tratta, indirizzoRientro, inCorso, onSalva, onAzz
           <span>Chilometri da inserire</span>
         )}
 
-        <span className="sr-only">Tratta {descrizione}</span>
+        {tratta.rientro ? (
+          <Badge variant="outline" title="Ritorno al punto di partenza della giornata">
+            rientro
+          </Badge>
+        ) : null}
+
+        <span className="sr-only">
+          {tratta.rientro ? 'Rientro' : 'Tratta'} {descrizione}
+        </span>
 
         <div className="ml-auto flex items-center gap-1">
           <Button

@@ -21,6 +21,7 @@ function tappa(id: string, label: string, position: number): Stop {
     lng: null,
     planned_time: null,
     notes: null,
+    is_start: false,
     created_at: ADESSO,
     updated_at: ADESSO,
   };
@@ -164,11 +165,15 @@ describe('TrattaInline', () => {
     expect(screen.getByText('12,5 km')).toBeInTheDocument();
   });
 
-  it('per il rientro indica l’indirizzo di partenza come destinazione', () => {
+  it('il rientro indica il ritorno alla tappa di partenza', () => {
     renderConProvider(
       <TrattaInline
-        tratta={tratta({ toStop: null, rientro: true, chiave: 's2->rientro' })}
-        indirizzoRientro="Via Torino 5"
+        tratta={tratta({
+          fromStop: tappa('s2', 'Cliente', 2),
+          toStop: tappa('s1', 'Casa', 1),
+          rientro: true,
+          chiave: 's2->rientro-s1',
+        })}
         inCorso={false}
         onSalva={vi.fn()}
         onAzzera={vi.fn()}
@@ -177,7 +182,7 @@ describe('TrattaInline', () => {
 
     expect(
       screen.getByRole('button', {
-        name: /Modifica i chilometri della tratta da Deposito a Via Torino 5/,
+        name: /Modifica i chilometri della tratta da Cliente a Casa/,
       }),
     ).toBeInTheDocument();
   });

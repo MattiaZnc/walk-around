@@ -25,7 +25,6 @@ import type { Stop } from '@/types/models';
 
 type Props = {
   sequenza: Sequenza;
-  indirizzoRientro: string | null;
   salvataggioTrattaInCorso: boolean;
   onRiordina: (idOrdinati: string[]) => void;
   onModificaTappa: (tappa: Stop) => void;
@@ -37,7 +36,6 @@ type Props = {
 
 export function ElencoTappe({
   sequenza,
-  indirizzoRientro,
   salvataggioTrattaInCorso,
   onRiordina,
   onModificaTappa,
@@ -131,7 +129,6 @@ export function ElencoTappe({
                     <TrattaInline
                       key={tratta.chiave}
                       tratta={tratta}
-                      indirizzoRientro={indirizzoRientro}
                       inCorso={salvataggioTrattaInCorso}
                       onSalva={(valori) => {
                         onSalvaTratta(tratta.chiave, valori);

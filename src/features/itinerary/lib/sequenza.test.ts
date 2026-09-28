@@ -24,6 +24,7 @@ function tappa(id: string, position: number, label = id.toUpperCase()): Stop {
     lng: null,
     planned_time: null,
     notes: null,
+    is_start: false,
     created_at: ADESSO,
     updated_at: ADESSO,
   };
@@ -78,7 +79,7 @@ describe('costruisciSequenza', () => {
     // La seconda coppia non ha ancora una riga: va inserita o calcolata.
     expect(sequenza.tratte[1]?.leg).toBeNull();
     expect(sequenza.tratte[1]?.fromStop.id).toBe('b');
-    expect(sequenza.tratte[1]?.toStop?.id).toBe('c');
+    expect(sequenza.tratte[1]?.toStop.id).toBe('c');
   });
 
   it('ordina le tappe per position anche se arrivano mescolate', () => {
@@ -101,17 +102,25 @@ describe('costruisciSequenza', () => {
     expect(con.tratte).toHaveLength(2);
     const rientro = con.tratte[1];
     expect(rientro?.rientro).toBe(true);
+    // Il rientro torna alla prima tappa, che è il punto di partenza.
     expect(rientro?.fromStop.id).toBe('b');
-    expect(rientro?.toStop).toBeNull();
+    expect(rientro?.toStop.id).toBe('a');
+  });
+
+  it('con una sola tappa non c’è rientro, sarebbe una tratta verso se stessa', () => {
+    const sequenza = costruisciSequenza(giornata([tappa('a', 1)], [], true));
+    expect(sequenza.tratte).toHaveLength(0);
   });
 
   it('associa la tratta di rientro solo se parte dall’ultima tappa', () => {
-    // Tratta di rientro rimasta agganciata a una tappa che non è più l'ultima.
+    // Tratta di rientro rimasta agganciata a una tappa che non è più l'ultima:
+    // qui punta da 'a' ad 'a', quindi non è la coppia attesa (b → a).
     const sequenza = costruisciSequenza(
-      giornata([tappa('a', 1), tappa('b', 2)], [tratta('l-rientro', 'a', null, 5)], true),
+      giornata([tappa('a', 1), tappa('b', 2)], [tratta('l-rientro', 'a', 'a', 5)], true),
     );
     const rientro = sequenza.tratte.at(-1);
     expect(rientro?.fromStop.id).toBe('b');
+    expect(rientro?.toStop.id).toBe('a');
     expect(rientro?.leg).toBeNull();
   });
 
@@ -264,13 +273,18 @@ describe('invalidaTratteNonAdiacenti', () => {
     expect(risultato).toHaveLength(0);
   });
 
-  it('tiene il rientro quando è attivo e parte dall’ultima tappa', () => {
-    const risultato = invalidaTratteNonAdiacenti(tappe, [tratta('l-r', 'c', null, 8)], true);
+  it('tiene il rientro quando è attivo e collega ultima e prima tappa', () => {
+    const risultato = invalidaTratteNonAdiacenti(tappe, [tratta('l-r', 'c', 'a', 8)], true);
     expect(risultato.map((leg) => leg.id)).toEqual(['l-r']);
   });
 
   it('elimina il rientro quando l’opzione è disattivata', () => {
-    const risultato = invalidaTratteNonAdiacenti(tappe, [tratta('l-r', 'c', null, 8)], false);
+    const risultato = invalidaTratteNonAdiacenti(tappe, [tratta('l-r', 'c', 'a', 8)], false);
+    expect(risultato).toHaveLength(0);
+  });
+
+  it('scarta le tratte con un estremo mancante, che il modello non prevede più', () => {
+    const risultato = invalidaTratteNonAdiacenti(tappe, [tratta('vecchia', 'c', null, 8)], true);
     expect(risultato).toHaveLength(0);
   });
 

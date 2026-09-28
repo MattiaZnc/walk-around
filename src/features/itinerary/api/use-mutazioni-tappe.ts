@@ -27,14 +27,14 @@ type Contesto = { precedente: CachePrecedente };
  */
 export function useCreaTappa(
   data: string,
-): UseMutationResult<Stop, AppError, { tappa: DatiTappa; posizione?: number }> {
+): UseMutationResult<Stop, AppError, { tappa: DatiTappa; posizione?: number; partenza?: boolean }> {
   const cache = useCacheGiornata(data);
 
   return useMutation({
     mutationKey: ['itinerario', 'crea-tappa', data],
-    mutationFn: async ({ tappa, posizione }) => {
+    mutationFn: async ({ tappa, posizione, partenza }) => {
       const giornata = await assicuraGiornata(data);
-      return aggiungiTappa(giornata.id, tappa, posizione);
+      return aggiungiTappa(giornata.id, tappa, posizione, partenza);
     },
     onSuccess: async () => {
       await cache.invalida();

@@ -165,6 +165,7 @@ export type Database = {
           address: string | null;
           created_at: string;
           id: string;
+          is_start: boolean;
           itinerary_id: string;
           label: string;
           lat: number | null;
@@ -179,6 +180,7 @@ export type Database = {
           address?: string | null;
           created_at?: string;
           id?: string;
+          is_start?: boolean;
           itinerary_id: string;
           label: string;
           lat?: number | null;
@@ -193,6 +195,7 @@ export type Database = {
           address?: string | null;
           created_at?: string;
           id?: string;
+          is_start?: boolean;
           itinerary_id?: string;
           label?: string;
           lat?: number | null;
@@ -226,6 +229,7 @@ export type Database = {
         Row: {
           date: string | null;
           estimated_legs_count: number | null;
+          has_start: boolean | null;
           itinerary_id: string | null;
           legs_count: number | null;
           manual_legs_count: number | null;
@@ -263,6 +267,7 @@ export type Database = {
       insert_stop_at: {
         Args: {
           p_address?: string;
+          p_is_start?: boolean;
           p_itinerary_id: string;
           p_label: string;
           p_lat?: number;
@@ -275,6 +280,7 @@ export type Database = {
           address: string | null;
           created_at: string;
           id: string;
+          is_start: boolean;
           itinerary_id: string;
           label: string;
           lat: number | null;

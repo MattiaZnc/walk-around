@@ -17,6 +17,7 @@ const tappaEsistente: Stop = {
   lng: 9.1896,
   planned_time: '08:30:00',
   notes: 'Ritiro merce',
+  is_start: false,
   created_at: '2026-05-04T06:00:00Z',
   updated_at: '2026-05-04T06:00:00Z',
 };

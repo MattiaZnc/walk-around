@@ -1,7 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Clock, GripVertical, MapPin, MapPinOff, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Clock, Flag, GripVertical, MapPin, MapPinOff, Pencil, Plus, Trash2 } from 'lucide-react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { oraBreve } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -71,7 +72,15 @@ export function RigaTappa({
         </span>
 
         <div className="min-w-0 flex-1 py-1">
-          <p className="font-medium leading-tight">{tappa.label}</p>
+          <p className="flex flex-wrap items-center gap-2 font-medium leading-tight">
+            {tappa.label}
+            {tappa.is_start ? (
+              <Badge variant="outline" className="gap-1 font-normal">
+                <Flag className="size-3" aria-hidden />
+                partenza
+              </Badge>
+            ) : null}
+          </p>
 
           {tappa.address ? (
             <p className="mt-1 flex items-start gap-1 text-sm text-muted-foreground">

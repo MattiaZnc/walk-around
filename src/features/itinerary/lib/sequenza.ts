@@ -11,10 +11,10 @@ export type Tratta = {
   /** Chiave stabile per React, valida anche quando la riga non esiste ancora. */
   chiave: string;
   fromStop: Stop;
-  /** null = rientro al punto di partenza del profilo. */
-  toStop: Stop | null;
+  /** Il rientro torna alla tappa di partenza, quindi c'è sempre un arrivo. */
+  toStop: Stop;
   leg: Leg | null;
-  /** true se questa tratta è il rientro finale. */
+  /** true se questa tratta è il rientro finale verso la partenza. */
   rientro: boolean;
 };
 
@@ -31,17 +31,18 @@ export type Sequenza = {
 export function costruisciSequenza(giornata: GiornataCompleta): Sequenza {
   const tappe = [...giornata.stops].sort((a, b) => a.position - b.position);
 
-  // Indice per tappa di partenza: l'unicità è garantita dal DB.
+  // Indice per tappa di partenza: una sola tratta in uscita per tappa,
+  // garantito da un indice unico sul database.
   const perPartenza = new Map<string, Leg>();
-  let legRientro: Leg | null = null;
-
   for (const leg of giornata.legs) {
-    if (leg.to_stop_id === null) {
-      legRientro = leg;
-    } else if (leg.from_stop_id !== null) {
-      perPartenza.set(leg.from_stop_id, leg);
-    }
+    if (leg.from_stop_id !== null) perPartenza.set(leg.from_stop_id, leg);
   }
+
+  /** Restituisce la tratta salvata per quella coppia, se combacia. */
+  const legDi = (da: Stop, a: Stop): Leg | null => {
+    const leg = perPartenza.get(da.id);
+    return leg && leg.to_stop_id === a.id ? leg : null;
+  };
 
   const tratte: Tratta[] = [];
 
@@ -50,28 +51,35 @@ export function costruisciSequenza(giornata: GiornataCompleta): Sequenza {
     const arrivo = tappe[indice + 1];
     if (!partenza || !arrivo) continue;
 
-    const leg = perPartenza.get(partenza.id) ?? null;
     tratte.push({
       chiave: `${partenza.id}->${arrivo.id}`,
       fromStop: partenza,
       toStop: arrivo,
-      leg: leg?.to_stop_id === arrivo.id ? leg : null,
+      leg: legDi(partenza, arrivo),
       rientro: false,
     });
   }
 
+  // Rientro: dall'ultima tappa a quella di partenza, che è la prima.
+  // Con una sola tappa non ha senso: sarebbe una tratta verso se stessa.
+  const prima = tappe[0];
   const ultima = tappe.at(-1);
-  if (giornata.itinerary.returns_to_start && ultima) {
+  if (giornata.itinerary.returns_to_start && prima && ultima && tappe.length > 1) {
     tratte.push({
-      chiave: `${ultima.id}->rientro`,
+      chiave: `${ultima.id}->rientro-${prima.id}`,
       fromStop: ultima,
-      toStop: null,
-      leg: legRientro?.from_stop_id === ultima.id ? legRientro : null,
+      toStop: prima,
+      leg: legDi(ultima, prima),
       rientro: true,
     });
   }
 
   return { tappe, tratte };
+}
+
+/** La tappa da cui comincia la giornata, se è stata scelta. */
+export function tappaDiPartenza(tappe: readonly Stop[]): Stop | null {
+  return tappe.find((tappa) => tappa.is_start) ?? null;
 }
 
 export type TotaliGiornataCalcolati = {
@@ -158,12 +166,15 @@ export function invalidaTratteNonAdiacenti(
     const arrivo = tappe[indice + 1];
     if (partenza && arrivo) attese.add(`${partenza.id}->${arrivo.id}`);
   }
+
+  const prima = tappe[0];
   const ultima = tappe.at(-1);
-  if (rientroAttivo && ultima) attese.add(`${ultima.id}->rientro`);
+  if (rientroAttivo && prima && ultima && tappe.length > 1) {
+    attese.add(`${ultima.id}->${prima.id}`);
+  }
 
   return legs.filter((leg) => {
-    if (leg.from_stop_id === null) return false;
-    const chiave = `${leg.from_stop_id}->${leg.to_stop_id ?? 'rientro'}`;
-    return attese.has(chiave);
+    if (leg.from_stop_id === null || leg.to_stop_id === null) return false;
+    return attese.has(`${leg.from_stop_id}->${leg.to_stop_id}`);
   });
 }

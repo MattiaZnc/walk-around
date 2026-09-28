@@ -98,6 +98,8 @@ export async function aggiungiTappa(
   itineraryId: string,
   tappa: DatiTappa,
   posizione?: number,
+  /** true per la tappa di partenza: va in testa e sostituisce la precedente. */
+  partenza = false,
 ): Promise<Stop> {
   const { data, error } = await supabase
     .rpc('insert_stop_at', {
@@ -109,6 +111,7 @@ export async function aggiungiTappa(
       p_planned_time: tappa.plannedTime ?? undefined,
       p_notes: tappa.notes ?? undefined,
       p_position: posizione,
+      p_is_start: partenza,
     })
     .single();
 

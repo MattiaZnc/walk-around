@@ -1,4 +1,4 @@
-import { AlertCircle, Copy, MapPinned, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { AlertCircle, Copy, Flag, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { PannelloResponsive } from '@/components/ui/pannello-responsive';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,6 +47,10 @@ import { ElencoTappe } from '@/features/itinerary/components/elenco-tappe';
 import { FormTappa } from '@/features/itinerary/components/form-tappa';
 import { MappaGiornata } from '@/features/itinerary/components/mappa-giornata';
 import { RiepilogoGiornata } from '@/features/itinerary/components/riepilogo-giornata';
+import {
+  SceltaPartenza,
+  type PartenzaScelta,
+} from '@/features/itinerary/components/scelta-partenza';
 import type { TappaInput, TrattaInput } from '@/features/itinerary/schemas/itinerary.schemas';
 import { puntoDiPartenza, useProfilo } from '@/features/profile/api/use-profilo';
 import { dataLunga } from '@/lib/format';
@@ -55,7 +59,9 @@ import type { Stop } from '@/types/models';
 type StatoPannello =
   | { tipo: 'chiuso' }
   | { tipo: 'nuova'; posizione?: number; iniziali?: Partial<TappaInput> }
-  | { tipo: 'modifica'; tappa: Stop };
+  | { tipo: 'modifica'; tappa: Stop }
+  /** Sostituzione del punto di partenza di una giornata che ne ha già uno. */
+  | { tipo: 'partenza' };
 
 function messaggioRicalcolo(tratteInvalidate: number): string | null {
   if (tratteInvalidate === 0) return null;
@@ -215,7 +221,7 @@ export function DettaglioGiornata({ data }: { data: string }) {
       legId: tratta.leg?.id ?? null,
       itineraryId: giornata.itinerary.id,
       fromStopId: tratta.fromStop.id,
-      toStopId: tratta.toStop?.id ?? null,
+      toStopId: tratta.toStop.id,
       valori: { distanceKm: valori.distanceKm, durationMin: valori.durationMin },
     });
   };
@@ -227,14 +233,13 @@ export function DettaglioGiornata({ data }: { data: string }) {
     aggiornaGiornata.mutate({ itineraryId: giornata.itinerary.id, notes: valore });
   };
 
-  // Coordinate del punto di partenza: servono per la tratta di rientro e per
-  // dare priorità ai luoghi vicini nella ricerca.
-  const coordinatePartenza: Coordinate | null =
+  // La partenza della giornata è una tappa: da lì cominciano i chilometri.
+  const coordinateProfilo: Coordinate | null =
     partenza && partenza.lat !== null && partenza.lng !== null
       ? { lat: partenza.lat, lng: partenza.lng }
       : null;
 
-  // Riferimento per la ricerca: l'ultima tappa con coordinate, altrimenti la partenza.
+  // Riferimento per la ricerca: l'ultima tappa con coordinate, altrimenti il profilo.
   const riferimentoRicerca =
     sequenza.tappe
       .slice()
@@ -242,7 +247,7 @@ export function DettaglioGiornata({ data }: { data: string }) {
       .map((tappa) =>
         tappa.lat !== null && tappa.lng !== null ? { lat: tappa.lat, lng: tappa.lng } : null,
       )
-      .find((coordinata): coordinata is Coordinate => coordinata !== null) ?? coordinatePartenza;
+      .find((coordinata): coordinata is Coordinate => coordinata !== null) ?? coordinateProfilo;
 
   const modalita: ModalitaViaggio = modalitaValida(giornata?.itinerary.travel_mode ?? 'auto');
 
@@ -254,11 +259,7 @@ export function DettaglioGiornata({ data }: { data: string }) {
   const eseguiRicalcolo = (soloMancanti: boolean) => {
     if (!giornata) return;
 
-    const { calcolabili, nonCalcolabili } = tratteDaCalcolare(
-      sequenza.tratte,
-      coordinatePartenza,
-      soloMancanti,
-    );
+    const { calcolabili, nonCalcolabili } = tratteDaCalcolare(sequenza.tratte, soloMancanti);
 
     if (calcolabili.length === 0) {
       toast.info(
@@ -298,77 +299,52 @@ export function DettaglioGiornata({ data }: { data: string }) {
     );
   };
 
-  // Giornata mai creata: stato vuoto con la scorciatoia al punto di partenza.
+  /** Salva la partenza come prima tappa della giornata. */
+  const confermaPartenza = (scelta: PartenzaScelta) => {
+    creaTappa.mutate(
+      {
+        tappa: {
+          label: scelta.label,
+          address: scelta.address,
+          lat: scelta.lat,
+          lng: scelta.lng,
+          plannedTime: null,
+          notes: null,
+        },
+        partenza: true,
+      },
+      {
+        onSuccess: () => {
+          const cambio = pannello.tipo === 'partenza';
+          setPannello({ tipo: 'chiuso' });
+          toast.success(cambio ? 'Punto di partenza aggiornato' : 'Punto di partenza impostato', {
+            description: cambio
+              ? 'Le tratte coinvolte vanno ricalcolate.'
+              : 'Ora aggiungi le tappe del giro.',
+            action: cambio
+              ? {
+                  label: 'Calcola',
+                  onClick: () => {
+                    eseguiRicalcolo(true);
+                  },
+                }
+              : undefined,
+          });
+        },
+      },
+    );
+  };
+
+  // Giornata senza tappe: prima di tutto si chiede da dove si parte, perché è
+  // il punto da cui si misurano i chilometri.
   if (!giornata || sequenza.tappe.length === 0) {
     return (
-      <>
-        <Card>
-          <CardHeader>
-            <CardTitle>Nessuna tappa per questo giorno</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Aggiungi la prima tappa per iniziare a costruire l’itinerario.
-            </p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                onClick={() => {
-                  apriNuovaTappa();
-                }}
-              >
-                <Plus aria-hidden />
-                Aggiungi la prima tappa
-              </Button>
-
-              {partenza ? (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setPannello({
-                      tipo: 'nuova',
-                      iniziali: {
-                        label: 'Partenza',
-                        address: partenza.indirizzo,
-                        lat: partenza.lat,
-                        lng: partenza.lng,
-                      },
-                    });
-                  }}
-                >
-                  <MapPinned aria-hidden />
-                  Parti da {partenza.indirizzo}
-                </Button>
-              ) : null}
-            </div>
-
-            {!partenza && profiloQuery.isSuccess ? (
-              <p className="text-xs text-muted-foreground">
-                Imposta un indirizzo di partenza nel profilo per averlo come suggerimento.
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <PannelloResponsive
-          aperto={pannello.tipo !== 'chiuso'}
-          onCambioApertura={(aperto) => {
-            if (!aperto) setPannello({ tipo: 'chiuso' });
-          }}
-          titolo="Nuova tappa"
-          descrizione={dataLunga(data)}
-        >
-          {pannello.tipo === 'nuova' ? (
-            <FormTappa
-              iniziali={pannello.iniziali}
-              inCorso={creaTappa.isPending}
-              onSalva={salvaTappa}
-              onAnnulla={() => {
-                setPannello({ tipo: 'chiuso' });
-              }}
-            />
-          ) : null}
-        </PannelloResponsive>
-      </>
+      <SceltaPartenza
+        data={data}
+        profilo={partenza}
+        inCorso={creaTappa.isPending}
+        onConferma={confermaPartenza}
+      />
     );
   }
 
@@ -383,6 +359,16 @@ export function DettaglioGiornata({ data }: { data: string }) {
         >
           <Plus aria-hidden />
           Aggiungi tappa
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setPannello({ tipo: 'partenza' });
+          }}
+          title="Cambia il punto da cui parte la giornata"
+        >
+          <Flag aria-hidden />
+          Cambia partenza
         </Button>
         <Button
           variant="outline"
@@ -423,21 +409,12 @@ export function DettaglioGiornata({ data }: { data: string }) {
           sopra l'elenco, così si vede il giro prima dei dettagli. */}
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start">
         <div className="md:sticky md:top-4 md:order-2">
-          <MappaGiornata
-            tappe={sequenza.tappe}
-            tratte={sequenza.tratte}
-            partenza={
-              giornata.itinerary.returns_to_start && partenza && coordinatePartenza
-                ? { indirizzo: partenza.indirizzo, ...coordinatePartenza }
-                : null
-            }
-          />
+          <MappaGiornata tappe={sequenza.tappe} tratte={sequenza.tratte} />
         </div>
 
         <div className="md:order-1">
           <ElencoTappe
             sequenza={sequenza}
-            indirizzoRientro={partenza?.indirizzo ?? null}
             salvataggioTrattaInCorso={salvaTratta.isPending}
             onRiordina={(idOrdinati) => {
               riordinaTappe.mutate(
@@ -565,9 +542,26 @@ export function DettaglioGiornata({ data }: { data: string }) {
         onCambioApertura={(aperto) => {
           if (!aperto) setPannello({ tipo: 'chiuso' });
         }}
-        titolo={pannello.tipo === 'modifica' ? 'Modifica tappa' : 'Nuova tappa'}
+        titolo={
+          pannello.tipo === 'modifica'
+            ? 'Modifica tappa'
+            : pannello.tipo === 'partenza'
+              ? 'Cambia il punto di partenza'
+              : 'Nuova tappa'
+        }
         descrizione={dataLunga(data)}
       >
+        {pannello.tipo === 'partenza' ? (
+          <SceltaPartenza
+            data={data}
+            profilo={partenza}
+            inCorso={creaTappa.isPending}
+            senzaIntestazione
+            onConferma={(scelta) => {
+              confermaPartenza(scelta);
+            }}
+          />
+        ) : null}
         {pannello.tipo === 'modifica' ? (
           <FormTappa
             tappa={pannello.tappa}

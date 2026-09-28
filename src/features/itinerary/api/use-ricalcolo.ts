@@ -21,7 +21,7 @@ export type TrattaCalcolabile = {
   chiave: string;
   legId: string | null;
   fromStopId: string;
-  toStopId: string | null;
+  toStopId: string;
   from: Coordinate;
   to: Coordinate;
 };
@@ -37,12 +37,13 @@ export type EsitoRicalcolo = {
  * Seleziona le tratte che si possono calcolare automaticamente.
  * Vengono escluse:
  *  - quelle con `source = 'manual'` (valore scelto dall'utente, non si tocca);
- *  - quelle con una tappa senza coordinate (niente da dare al provider);
- *  - il rientro, se il profilo non ha un punto di partenza con coordinate.
+ *  - quelle con una tappa senza coordinate (niente da dare al provider).
+ *
+ * Il rientro non è un caso particolare: punta alla tappa di partenza, quindi
+ * ha due estremi come tutte le altre.
  */
 export function tratteDaCalcolare(
   tratte: readonly Tratta[],
-  partenza: Coordinate | null,
   soloMancanti: boolean,
 ): { calcolabili: TrattaCalcolabile[]; nonCalcolabili: number } {
   const calcolabili: TrattaCalcolabile[] = [];
@@ -53,7 +54,7 @@ export function tratteDaCalcolare(
     if (soloMancanti && tratta.leg) continue;
 
     const from = coordinateDi(tratta.fromStop);
-    const to = tratta.rientro ? partenza : coordinateDi(tratta.toStop);
+    const to = coordinateDi(tratta.toStop);
 
     if (!from || !to) {
       nonCalcolabili += 1;
@@ -64,7 +65,7 @@ export function tratteDaCalcolare(
       chiave: tratta.chiave,
       legId: tratta.leg?.id ?? null,
       fromStopId: tratta.fromStop.id,
-      toStopId: tratta.toStop?.id ?? null,
+      toStopId: tratta.toStop.id,
       from,
       to,
     });
@@ -73,8 +74,8 @@ export function tratteDaCalcolare(
   return { calcolabili, nonCalcolabili };
 }
 
-function coordinateDi(tappa: { lat: number | null; lng: number | null } | null): Coordinate | null {
-  if (!tappa || tappa.lat === null || tappa.lng === null) return null;
+function coordinateDi(tappa: { lat: number | null; lng: number | null }): Coordinate | null {
+  if (tappa.lat === null || tappa.lng === null) return null;
   return { lat: tappa.lat, lng: tappa.lng };
 }
 
