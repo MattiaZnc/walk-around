@@ -173,6 +173,7 @@ export type Database = {
           notes: string | null;
           planned_time: string | null;
           position: number;
+          reached_at: string | null;
           updated_at: string;
           user_id: string;
         };
@@ -188,6 +189,7 @@ export type Database = {
           notes?: string | null;
           planned_time?: string | null;
           position: number;
+          reached_at?: string | null;
           updated_at?: string;
           user_id?: string;
         };
@@ -203,6 +205,7 @@ export type Database = {
           notes?: string | null;
           planned_time?: string | null;
           position?: number;
+          reached_at?: string | null;
           updated_at?: string;
           user_id?: string;
         };
@@ -233,6 +236,7 @@ export type Database = {
           itinerary_id: string | null;
           legs_count: number | null;
           manual_legs_count: number | null;
+          reached_count: number | null;
           returns_to_start: boolean | null;
           stops_count: number | null;
           total_duration_min: number | null;
@@ -288,6 +292,7 @@ export type Database = {
           notes: string | null;
           planned_time: string | null;
           position: number;
+          reached_at: string | null;
           updated_at: string;
           user_id: string;
         };

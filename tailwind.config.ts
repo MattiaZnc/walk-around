@@ -49,6 +49,11 @@ export default {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
         },
+        reached: {
+          DEFAULT: 'hsl(var(--reached))',
+          border: 'hsl(var(--reached-border))',
+          foreground: 'hsl(var(--reached-foreground))',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

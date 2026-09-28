@@ -32,6 +32,12 @@
     --warning: 32 90% 34%;
     --warning-foreground: 0 0% 100%;
 
+    /* Tappa raggiunta: un verde chiarissimo che si nota senza urlare,
+       e un verde pieno per la spunta (contrasto AA sul fondo chiaro). */
+    --reached: 142 72% 96%;
+    --reached-border: 142 55% 72%;
+    --reached-foreground: 142 72% 25%;
+
     --border: 214 32% 88%;
     --input: 214 32% 88%;
     --ring: 158 64% 30%;
@@ -66,6 +72,12 @@
 
     --warning: 38 92% 62%;
     --warning-foreground: 222 47% 8%;
+
+    /* Sul tema scuro un verde chiarissimo accecherebbe: si usa un verde cupo
+       con testo chiaro, mantenendo lo stesso significato. */
+    --reached: 142 40% 14%;
+    --reached-border: 142 40% 32%;
+    --reached-foreground: 142 60% 75%;
 
     --border: 217 33% 22%;
     --input: 217 33% 24%;

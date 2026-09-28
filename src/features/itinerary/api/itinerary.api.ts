@@ -203,6 +203,23 @@ export async function salvaTrattaManuale(parametri: {
   return data;
 }
 
+/**
+ * Marca (o smarca) una tappa come raggiunta.
+ * `quando` è il momento dell'arrivo, `null` annulla: si salva l'orario e non un
+ * semplice sì/no, perché serve per confrontarlo con quello previsto.
+ */
+export async function segnaTappaRaggiunta(stopId: string, quando: string | null): Promise<Stop> {
+  const { data, error } = await supabase
+    .from('stops')
+    .update({ reached_at: quando })
+    .eq('id', stopId)
+    .select()
+    .single();
+
+  if (error) throw toAppError(error);
+  return data;
+}
+
 export async function eliminaTratta(legId: string): Promise<void> {
   const { error } = await supabase.from('legs').delete().eq('id', legId);
   if (error) throw toAppError(error);

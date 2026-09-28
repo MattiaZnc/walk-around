@@ -8,6 +8,7 @@ import {
   assicuraGiornata,
   eliminaTappa,
   riordinaTappe,
+  segnaTappaRaggiunta,
   type DatiTappa,
 } from '@/features/itinerary/api/itinerary.api';
 import {
@@ -151,6 +152,37 @@ export function useRiordinaTappe(
     onError: (errore, _variabili, contesto) => {
       cache.ripristina(contesto?.precedente);
       toast.error(messaggioErrore(errore), { description: 'L’ordine è stato ripristinato.' });
+    },
+    onSettled: async () => {
+      await cache.invalida();
+    },
+  });
+}
+
+/**
+ * Segna una tappa come raggiunta, o annulla.
+ * Ottimistica: durante il giro il riscontro deve essere immediato, la rete
+ * mobile può metterci qualche secondo.
+ */
+export function useSegnaRaggiunta(
+  data: string,
+): UseMutationResult<Stop, AppError, { stopId: string; quando: string | null }, Contesto> {
+  const cache = useCacheGiornata(data);
+
+  return useMutation({
+    mutationKey: ['itinerario', 'segna-raggiunta', data],
+    mutationFn: ({ stopId, quando }) => segnaTappaRaggiunta(stopId, quando),
+    onMutate: async ({ stopId, quando }) => {
+      const precedente = await cache.applica((giornata) => ({
+        ...giornata,
+        stops: giornata.stops.map((tappa) =>
+          tappa.id === stopId ? { ...tappa, reached_at: quando } : tappa,
+        ),
+      }));
+      return { precedente };
+    },
+    onError: (_errore, _variabili, contesto) => {
+      cache.ripristina(contesto?.precedente);
     },
     onSettled: async () => {
       await cache.invalida();

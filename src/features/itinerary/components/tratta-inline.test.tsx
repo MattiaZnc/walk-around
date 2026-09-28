@@ -22,6 +22,7 @@ function tappa(id: string, label: string, position: number): Stop {
     planned_time: null,
     notes: null,
     is_start: false,
+    reached_at: null,
     created_at: ADESSO,
     updated_at: ADESSO,
   };

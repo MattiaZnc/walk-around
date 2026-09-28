@@ -2,10 +2,12 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapPinOff } from 'lucide-react';
 import * as React from 'react';
-import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
+import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
 
 import { useTheme } from '@/components/layout/theme-provider';
 import type { Geometria } from '@/features/itinerary/api/percorsi.api';
+import type { Posizione } from '@/features/itinerary/lib/prossimita';
+import { oraDiArrivo } from '@/features/itinerary/lib/prossimita-formato';
 import type { Tratta } from '@/features/itinerary/lib/sequenza';
 import { configurazioneTile } from '@/features/itinerary/lib/tile-mappa';
 import { durata, km, oraBreve } from '@/lib/format';
@@ -15,6 +17,8 @@ import type { Stop } from '@/types/models';
 type Props = {
   tappe: Stop[];
   tratte: Tratta[];
+  /** Posizione corrente, quando "Seguimi" è attivo. */
+  posizione?: Posizione | null;
   className?: string;
 };
 
@@ -25,18 +29,28 @@ const CENTRO_PREDEFINITO: [number, number] = [41.9028, 12.4964];
  * Marker numerato disegnato come HTML: un'icona immagine per ogni numero
  * richiederebbe file separati, e i `divIcon` restano nitidi su schermi retina.
  */
-function iconaNumerata(numero: number, partenza: boolean): L.DivIcon {
+function iconaNumerata(numero: number, partenza: boolean, raggiunta: boolean): L.DivIcon {
   // La partenza si distingue a colpo d'occhio: è il punto da cui si misurano
-  // i chilometri, non una tappa qualsiasi.
-  const colore = partenza ? 'hsl(var(--foreground))' : 'hsl(var(--primary))';
-  const contenuto = String(numero);
+  // i chilometri, non una tappa qualsiasi. Le tappe raggiunte mostrano una
+  // spunta al posto del numero.
+  const colore = raggiunta
+    ? 'hsl(var(--reached-foreground))'
+    : partenza
+      ? 'hsl(var(--foreground))'
+      : 'hsl(var(--primary))';
+
+  // Spunta disegnata come SVG: un carattere di testo cambia forma da un
+  // dispositivo all'altro e non si allinea al centro.
+  const contenuto = raggiunta
+    ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
+    : String(numero);
 
   return L.divIcon({
     className: 'marker-tappa',
     html: `<span style="
       display:flex;align-items:center;justify-content:center;
       width:28px;height:28px;border-radius:9999px;
-      background:${colore};color:hsl(var(--background));
+      background:${colore};color:${raggiunta ? 'hsl(var(--reached))' : 'hsl(var(--background))'};
       font:600 13px/1 system-ui,sans-serif;
       box-shadow:0 1px 4px rgb(0 0 0 / .4);
       border:${partenza ? '3px solid hsl(var(--primary))' : '2px solid hsl(var(--background))'};
@@ -44,6 +58,20 @@ function iconaNumerata(numero: number, partenza: boolean): L.DivIcon {
     iconSize: [28, 28],
     iconAnchor: [14, 14],
     popupAnchor: [0, -14],
+  });
+}
+
+/** Punto blu della posizione corrente, distinto dai marker delle tappe. */
+function iconaPosizione(): L.DivIcon {
+  return L.divIcon({
+    className: 'marker-posizione',
+    html: `<span style="
+      display:block;width:16px;height:16px;border-radius:9999px;
+      background:#2563eb;border:3px solid #fff;
+      box-shadow:0 0 0 1px rgb(0 0 0 / .3);
+    "></span>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
   });
 }
 
@@ -80,7 +108,7 @@ function AdattaVista({ punti }: { punti: [number, number][] }) {
   return null;
 }
 
-export function MappaGiornata({ tappe, tratte, className }: Props) {
+export function MappaGiornata({ tappe, tratte, posizione, className }: Props) {
   const { resolvedTheme } = useTheme();
 
   const tappeConCoordinate = tappe
@@ -181,12 +209,36 @@ export function MappaGiornata({ tappe, tratte, className }: Props) {
           />
         ))}
 
+        {/* Posizione corrente: il cerchio rappresenta l'incertezza del
+            segnale, così si capisce quanto fidarsi del puntino. */}
+        {posizione ? (
+          <>
+            <Circle
+              center={[posizione.lat, posizione.lng]}
+              radius={posizione.accuratezza}
+              pathOptions={{
+                color: '#2563eb',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.15,
+                weight: 1,
+              }}
+            />
+            <Marker
+              position={[posizione.lat, posizione.lng]}
+              icon={iconaPosizione()}
+              title="La tua posizione"
+            />
+          </>
+        ) : null}
+
         {tappeConCoordinate.map(({ tappa, numero }) => (
           <Marker
             key={tappa.id}
             position={[tappa.lat, tappa.lng]}
-            icon={iconaNumerata(numero, tappa.is_start)}
-            title={`${numero}. ${tappa.label}${tappa.is_start ? ' (partenza)' : ''}`}
+            icon={iconaNumerata(numero, tappa.is_start, tappa.reached_at !== null)}
+            title={`${numero}. ${tappa.label}${tappa.is_start ? ' (partenza)' : ''}${
+              tappa.reached_at !== null ? ' — raggiunta' : ''
+            }`}
           >
             <Popup>
               <p className="font-semibold">
@@ -194,6 +246,12 @@ export function MappaGiornata({ tappe, tratte, className }: Props) {
               </p>
               {tappa.is_start ? (
                 <p className="text-xs font-medium">Punto di partenza della giornata</p>
+              ) : null}
+              {tappa.reached_at !== null ? (
+                <p className="text-xs font-medium">
+                  Raggiunta
+                  {oraDiArrivo(tappa.reached_at) ? ` alle ${oraDiArrivo(tappa.reached_at)}` : ''}
+                </p>
               ) : null}
               {tappa.address ? <p className="text-xs">{tappa.address}</p> : null}
               {tappa.planned_time ? (
@@ -206,6 +264,28 @@ export function MappaGiornata({ tappe, tratte, className }: Props) {
 
       {/* Riepilogo testuale: la mappa da sola non è accessibile */}
       <ol className="sr-only">
+        {/* Posizione corrente: il cerchio rappresenta l'incertezza del
+            segnale, così si capisce quanto fidarsi del puntino. */}
+        {posizione ? (
+          <>
+            <Circle
+              center={[posizione.lat, posizione.lng]}
+              radius={posizione.accuratezza}
+              pathOptions={{
+                color: '#2563eb',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.15,
+                weight: 1,
+              }}
+            />
+            <Marker
+              position={[posizione.lat, posizione.lng]}
+              icon={iconaPosizione()}
+              title="La tua posizione"
+            />
+          </>
+        ) : null}
+
         {tappeConCoordinate.map(({ tappa, numero }) => (
           <li key={tappa.id}>
             Tappa {numero}: {tappa.label}

@@ -19,6 +19,7 @@ function tappa(id: string, coordinate: { lat: number; lng: number } | null): Sto
     planned_time: null,
     notes: null,
     is_start: false,
+    reached_at: null,
     created_at: ADESSO,
     updated_at: ADESSO,
   };

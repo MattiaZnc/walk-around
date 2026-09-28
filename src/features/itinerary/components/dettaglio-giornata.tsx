@@ -41,6 +41,7 @@ import {
   useCreaTappa,
   useEliminaTappa,
   useRiordinaTappe,
+  useSegnaRaggiunta,
 } from '@/features/itinerary/api/use-mutazioni-tappe';
 import {
   useAggiornaGiornata,
@@ -53,6 +54,8 @@ import { DialogoDuplica } from '@/features/itinerary/components/dialogo-duplica'
 import { ElencoTappe } from '@/features/itinerary/components/elenco-tappe';
 import { FormTappa } from '@/features/itinerary/components/form-tappa';
 import { MappaGiornata } from '@/features/itinerary/components/mappa-giornata';
+import { Seguimi } from '@/features/itinerary/components/seguimi';
+import type { Posizione } from '@/features/itinerary/lib/prossimita';
 import { RiepilogoGiornata } from '@/features/itinerary/components/riepilogo-giornata';
 import {
   SceltaPartenza,
@@ -92,12 +95,15 @@ export function DettaglioGiornata({ data }: { data: string }) {
   const eliminaGiornata = useEliminaGiornata();
   const duplicaGiornata = useDuplicaGiornata();
   const ricalcola = useRicalcolaTratte(data);
+  const segnaRaggiunta = useSegnaRaggiunta(data);
 
   const [pannello, setPannello] = React.useState<StatoPannello>({ tipo: 'chiuso' });
   const [tappaDaEliminare, setTappaDaEliminare] = React.useState<Stop | null>(null);
   const [confermaEliminaGiornata, setConfermaEliminaGiornata] = React.useState(false);
   const [duplicaAperto, setDuplicaAperto] = React.useState(false);
   const [dataInConflitto, setDataInConflitto] = React.useState<string | null>(null);
+  const [seguimiAttivo, setSeguimiAttivo] = React.useState(false);
+  const [posizione, setPosizione] = React.useState<Posizione | null>(null);
 
   const giornata = giornataQuery.data ?? null;
   const { sequenza, totali } = vistaGiornata(giornata);
@@ -215,6 +221,43 @@ export function DettaglioGiornata({ data }: { data: string }) {
               },
             },
           });
+        },
+      },
+    );
+  };
+
+  /**
+   * Arrivo a una o più tappe: si salva il momento, si avvisa e si fa vibrare il
+   * telefono. Durante un giro lo schermo è spesso in tasca: la vibrazione è
+   * l'unico segnale che arriva davvero.
+   */
+  const gestisciArrivo = (raggiunte: Stop[]) => {
+    const adesso = new Date().toISOString();
+
+    for (const tappa of raggiunte) {
+      segnaRaggiunta.mutate({ stopId: tappa.id, quando: adesso });
+    }
+
+    const nomi = raggiunte.map((tappa) => tappa.label).join(', ');
+    toast.success(
+      raggiunte.length === 1 ? `Obiettivo raggiunto: ${nomi}` : `Obiettivi raggiunti: ${nomi}`,
+      {
+        duration: 8000,
+      },
+    );
+
+    if ('vibrate' in navigator) {
+      // Due colpi brevi: riconoscibili senza guardare lo schermo.
+      navigator.vibrate([120, 60, 120]);
+    }
+  };
+
+  const cambiaRaggiunta = (tappa: Stop, raggiunta: boolean) => {
+    segnaRaggiunta.mutate(
+      { stopId: tappa.id, quando: raggiunta ? new Date().toISOString() : null },
+      {
+        onSuccess: () => {
+          if (!raggiunta) toast.info(`"${tappa.label}" non è più segnata come raggiunta`);
         },
       },
     );
@@ -426,13 +469,25 @@ export function DettaglioGiornata({ data }: { data: string }) {
         </DropdownMenu>
       </div>
 
+      {/* Seguimi ha senso solo se c'è almeno una tappa da raggiungere con
+          coordinate: senza, non ci sarebbe nulla da confrontare. */}
+      {sequenza.tappe.some((tappa) => tappa.lat !== null) ? (
+        <Seguimi
+          tappe={sequenza.tappe}
+          attivo={seguimiAttivo}
+          onCambioAttivo={setSeguimiAttivo}
+          onArrivo={gestisciArrivo}
+          onPosizione={setPosizione}
+        />
+      ) : null}
+
       <RiepilogoGiornata totali={totali} numeroTappe={sequenza.tappe.length} />
 
       {/* Su desktop elenco e mappa sono affiancati; su telefono la mappa sta
           sopra l'elenco, così si vede il giro prima dei dettagli. */}
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start">
         <div className="md:sticky md:top-4 md:order-2">
-          <MappaGiornata tappe={sequenza.tappe} tratte={sequenza.tratte} />
+          <MappaGiornata tappe={sequenza.tappe} tratte={sequenza.tratte} posizione={posizione} />
         </div>
 
         <div className="md:order-1">
@@ -470,6 +525,7 @@ export function DettaglioGiornata({ data }: { data: string }) {
             onAzzeraTratta={(legId) => {
               eliminaTratta.mutate({ legId });
             }}
+            onCambiaRaggiunta={cambiaRaggiunta}
           />
         </div>
       </div>

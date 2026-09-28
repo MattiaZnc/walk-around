@@ -124,3 +124,30 @@ Il tema scuro si ottiene invertendo i colori delle mattonelle via CSS
 (`.mappa-tema-scuro`), perché OpenStreetMap non ha una variante scura. Il
 filtro è applicato al solo `leaflet-tile-pane`: marker e tracciato restano dei
 loro colori.
+
+## Tappe raggiunte
+
+Durante il giro il pulsante **Seguimi** avvia `watchPosition` e confronta la
+posizione con le tappe: entro 75 metri la tappa viene segnata come raggiunta
+(`stops.reached_at`), la riga diventa verde chiarissimo e sulla mappa il numero
+lascia il posto a una spunta.
+
+La logica sta in `lib/prossimita.ts`, senza React né geolocalizzazione: è il
+solo modo per provarla con posizioni finte invece di camminare.
+
+Tre decisioni che valgono più della soglia:
+
+- **La localizzazione non parte da sola.** `watchPosition` con alta precisione
+  tiene il GPS accesso e la batteria si consuma in fretta: chiedere la posizione
+  a chi sta solo pianificando la giornata sarebbe invadente e inutile.
+- **Oltre 120 metri di incertezza non si decide.** Con un segnale debole
+  (dentro un edificio, rete mobile senza GPS) si marcherebbero tappe a caso;
+  l'app lo dice e lascia fare a mano.
+- **Il raggio si allarga fino all'incertezza dichiarata.** Con accuratezza di
+  100 metri, essere "a 90 metri" può già significare essere sul posto.
+
+Le tappe già segnalate non vengono riproposte: restando nel raggio, ogni
+rilevamento del GPS rifarebbe scattare l'avviso.
+
+Si può sempre segnare o annullare a mano dalla riga della tappa: il GPS sbaglia,
+e un dato che non si può correggere è peggio di un dato assente.

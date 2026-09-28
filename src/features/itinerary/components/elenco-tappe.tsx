@@ -32,6 +32,7 @@ type Props = {
   onInserisciSotto: (posizione: number) => void;
   onSalvaTratta: (chiaveTratta: string, valori: TrattaInput) => void;
   onAzzeraTratta: (legId: string) => void;
+  onCambiaRaggiunta: (tappa: Stop, raggiunta: boolean) => void;
 };
 
 export function ElencoTappe({
@@ -43,6 +44,7 @@ export function ElencoTappe({
   onInserisciSotto,
   onSalvaTratta,
   onAzzeraTratta,
+  onCambiaRaggiunta,
 }: Props) {
   // Il touch richiede una piccola pressione prima di iniziare il trascinamento,
   // altrimenti lo scroll della pagina diventa impossibile.
@@ -123,6 +125,9 @@ export function ElencoTappe({
                     }}
                     onInserisciSotto={() => {
                       onInserisciSotto(indice + 2);
+                    }}
+                    onCambiaRaggiunta={(raggiunta) => {
+                      onCambiaRaggiunta(tappa, raggiunta);
                     }}
                   />
                   {tratta && !inTrascinamento ? (

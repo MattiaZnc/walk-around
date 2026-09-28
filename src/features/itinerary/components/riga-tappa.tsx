@@ -1,10 +1,22 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Clock, Flag, GripVertical, MapPin, MapPinOff, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  Check,
+  Circle,
+  Clock,
+  Flag,
+  GripVertical,
+  MapPin,
+  MapPinOff,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { oraBreve } from '@/lib/format';
+import { oraDiArrivo } from '@/features/itinerary/lib/prossimita-formato';
 import { cn } from '@/lib/utils';
 import type { Stop } from '@/types/models';
 
@@ -15,6 +27,8 @@ type Props = {
   onModifica: () => void;
   onElimina: () => void;
   onInserisciSotto: () => void;
+  /** Marca o smarca la tappa come raggiunta. */
+  onCambiaRaggiunta: (raggiunta: boolean) => void;
 };
 
 /**
@@ -29,6 +43,7 @@ export function RigaTappa({
   onModifica,
   onElimina,
   onInserisciSotto,
+  onCambiaRaggiunta,
 }: Props) {
   const {
     attributes,
@@ -41,13 +56,17 @@ export function RigaTappa({
   } = useSortable({ id: tappa.id });
 
   const senzaCoordinate = tappa.lat === null || tappa.lng === null;
+  const raggiunta = tappa.reached_at !== null;
 
   return (
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
-        'relative rounded-lg border bg-card',
+        'relative rounded-lg border bg-card transition-colors',
+        // Verde chiarissimo: si vede a colpo d'occhio quali tappe sono fatte,
+        // senza che la riga diventi illeggibile.
+        raggiunta && 'border-reached-border bg-reached',
         isDragging && 'z-10 shadow-lg ring-2 ring-primary',
       )}
     >
@@ -65,10 +84,13 @@ export function RigaTappa({
         </Button>
 
         <span
-          className="tabular mt-1.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
+          className={cn(
+            'tabular mt-1.5 flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold',
+            raggiunta ? 'bg-reached-foreground text-reached' : 'bg-primary/10 text-primary',
+          )}
           aria-hidden
         >
-          {numero}
+          {raggiunta ? <Check className="size-4" /> : numero}
         </span>
 
         <div className="min-w-0 flex-1 py-1">
@@ -78,6 +100,16 @@ export function RigaTappa({
               <Badge variant="outline" className="gap-1 font-normal">
                 <Flag className="size-3" aria-hidden />
                 partenza
+              </Badge>
+            ) : null}
+            {raggiunta ? (
+              <Badge
+                variant="outline"
+                className="gap-1 border-reached-border font-normal text-reached-foreground"
+              >
+                <Check className="size-3" aria-hidden />
+                raggiunta
+                {oraDiArrivo(tappa.reached_at) ? ` alle ${oraDiArrivo(tappa.reached_at)}` : ''}
               </Badge>
             ) : null}
           </p>
@@ -113,6 +145,23 @@ export function RigaTappa({
         </div>
 
         <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              onCambiaRaggiunta(!raggiunta);
+            }}
+            aria-label={
+              raggiunta
+                ? `Segna ${tappa.label} come non raggiunta`
+                : `Segna ${tappa.label} come raggiunta`
+            }
+            aria-pressed={raggiunta}
+            title={raggiunta ? 'Annulla: non ancora raggiunta' : 'Segna come raggiunta'}
+            className={raggiunta ? 'text-reached-foreground' : undefined}
+          >
+            {raggiunta ? <Check aria-hidden /> : <Circle aria-hidden />}
+          </Button>
           <Button
             variant="ghost"
             size="icon"
