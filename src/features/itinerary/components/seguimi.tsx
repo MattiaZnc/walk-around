@@ -19,6 +19,12 @@ type Props = {
   /** Chiamata quando una o più tappe risultano raggiunte. */
   onArrivo: (tappe: Stop[]) => void;
   onPosizione: (posizione: Posizione | null) => void;
+  /**
+   * true quando il pulsante galleggia sopra la mappa (angolo in alto a
+   * destra, libero dai controlli di Leaflet). Il contenitore deve essere
+   * `relative`: lo stato del giro scorre invece sotto la mappa.
+   */
+  sovrapposto?: boolean;
 };
 
 /**
@@ -28,7 +34,14 @@ type Props = {
  * l'utente l'abbia chiesto è invadente, e il GPS acceso consuma batteria in
  * modo evidente.
  */
-export function Seguimi({ tappe, attivo, onCambioAttivo, onArrivo, onPosizione }: Props) {
+export function Seguimi({
+  tappe,
+  attivo,
+  onCambioAttivo,
+  onArrivo,
+  onPosizione,
+  sovrapposto = false,
+}: Props) {
   const { posizione, errore, inAttesa, supportata } = useGeolocalizzazione(attivo);
 
   // Le tappe già segnalate non vengono riproposte: senza questo, restando nel
@@ -75,6 +88,13 @@ export function Seguimi({ tappe, attivo, onCambioAttivo, onArrivo, onPosizione }
           onCambioAttivo(!attivo);
         }}
         aria-pressed={attivo}
+        className={cn(
+          sovrapposto &&
+            // Sopra la mappa serve un fondo pieno e un'ombra, altrimenti il
+            // pulsante si confonde con le strade disegnate sotto.
+            'absolute right-3 top-3 z-10 h-10 min-h-0 rounded-full px-4 shadow-md',
+          sovrapposto && !attivo && 'bg-background',
+        )}
       >
         {attivo ? <LocateFixed aria-hidden /> : <LocateOff aria-hidden />}
         {attivo ? 'Seguimi attivo' : 'Seguimi'}

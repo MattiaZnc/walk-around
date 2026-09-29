@@ -43,18 +43,35 @@ describe('AppLayout', () => {
     }
   });
 
-  it('il profilo resta raggiungibile dal menu utente', async () => {
+  it('il menu utente offre il cambio tema e l’uscita', async () => {
     const utente = userEvent.setup();
     render();
 
     await utente.click(screen.getAllByRole('button', { name: 'Account e impostazioni' })[0]!);
 
     const menu = await screen.findByRole('menu');
-    // Dentro un menu Radix assegna role="menuitem", non "link": è il ruolo
-    // corretto per una voce di menu, pur restando un vero collegamento.
-    const voceProfilo = within(menu).getByRole('menuitem', { name: 'Profilo' });
-    expect(voceProfilo).toHaveAttribute('href', '/profilo');
+    // Il tema stava in un'icona a forma di monitor che non diceva cosa facesse:
+    // qui ogni scelta ha un'etichetta.
+    for (const tema of ['Chiaro', 'Scuro', 'Automatico']) {
+      expect(within(menu).getByRole('menuitemradio', { name: tema })).toBeInTheDocument();
+    }
     expect(within(menu).getByRole('menuitem', { name: 'Esci' })).toBeInTheDocument();
+  });
+
+  it('scegliendo un tema il menu resta aperto e la scelta è segnata', async () => {
+    const utente = userEvent.setup();
+    render();
+
+    await utente.click(screen.getAllByRole('button', { name: 'Account e impostazioni' })[0]!);
+    const menu = await screen.findByRole('menu');
+    await utente.click(within(menu).getByRole('menuitemradio', { name: 'Scuro' }));
+
+    expect(screen.getByRole('menuitemradio', { name: 'Scuro' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    document.documentElement.classList.remove('dark');
   });
 
   it('offre un collegamento per saltare al contenuto', () => {

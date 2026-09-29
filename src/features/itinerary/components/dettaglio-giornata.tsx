@@ -399,13 +399,14 @@ export function DettaglioGiornata({ data }: { data: string }) {
   }
 
   return (
-    <div className="space-y-4 pb-24 md:pb-0">
+    <div className="space-y-4 pb-16 md:pb-0">
       {/* Azioni sulla giornata.
           Solo le due più frequenti restano visibili: cinque pulsanti in fila
           andavano a capo e quello distruttivo finiva isolato accanto alla
           mappa, dove sembrava appartenerle. */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2">
         <Button
+          className="flex-1 sm:flex-none"
           onClick={() => {
             apriNuovaTappa();
           }}
@@ -428,13 +429,13 @@ export function DettaglioGiornata({ data }: { data: string }) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-2">
+            <Button variant="outline" size="icon" className="shrink-0 sm:w-auto sm:px-3">
               <MoreHorizontal aria-hidden />
               <span className="sr-only sm:not-sr-only">Altro</span>
             </Button>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="start">
+          <DropdownMenuContent align="end">
             <DropdownMenuItem
               onSelect={() => {
                 setPannello({ tipo: 'partenza' });
@@ -469,25 +470,25 @@ export function DettaglioGiornata({ data }: { data: string }) {
         </DropdownMenu>
       </div>
 
-      {/* Seguimi ha senso solo se c'è almeno una tappa da raggiungere con
-          coordinate: senza, non ci sarebbe nulla da confrontare. */}
-      {sequenza.tappe.some((tappa) => tappa.lat !== null) ? (
-        <Seguimi
-          tappe={sequenza.tappe}
-          attivo={seguimiAttivo}
-          onCambioAttivo={setSeguimiAttivo}
-          onArrivo={gestisciArrivo}
-          onPosizione={setPosizione}
-        />
-      ) : null}
-
       <RiepilogoGiornata totali={totali} numeroTappe={sequenza.tappe.length} />
 
       {/* Su desktop elenco e mappa sono affiancati; su telefono la mappa sta
           sopra l'elenco, così si vede il giro prima dei dettagli. */}
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start">
-        <div className="md:sticky md:top-4 md:order-2">
+        <div className="relative space-y-2 md:sticky md:top-4 md:order-2">
           <MappaGiornata tappe={sequenza.tappe} tratte={sequenza.tratte} posizione={posizione} />
+          {/* Seguimi sta sulla mappa, dove si guarda durante il giro. Ha senso
+              solo se almeno una tappa ha coordinate da confrontare. */}
+          {sequenza.tappe.some((tappa) => tappa.lat !== null) ? (
+            <Seguimi
+              sovrapposto
+              tappe={sequenza.tappe}
+              attivo={seguimiAttivo}
+              onCambioAttivo={setSeguimiAttivo}
+              onArrivo={gestisciArrivo}
+              onPosizione={setPosizione}
+            />
+          ) : null}
         </div>
 
         <div className="md:order-1">
@@ -569,24 +570,25 @@ export function DettaglioGiornata({ data }: { data: string }) {
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              I chilometri dipendono dal mezzo: fra Colosseo e Villa Borghese ci sono 3,6 km a piedi
-              e 7,5 km in auto.
+              Il mezzo cambia il percorso, quindi anche i chilometri.
             </p>
           </div>
 
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <Label htmlFor="rientro">Ritorno al punto di partenza</Label>
+              {/* Il rientro va alla prima tappa, non all'indirizzo del profilo:
+                  basta che ci sia un percorso da chiudere. */}
               <p className="text-sm text-muted-foreground">
-                {partenza
-                  ? `Aggiunge la tratta finale verso ${partenza.indirizzo}.`
-                  : 'Imposta prima un indirizzo di partenza nel profilo.'}
+                {sequenza.tappe.length > 1
+                  ? `Aggiunge la tratta finale verso ${sequenza.tappe[0]?.label ?? 'la partenza'}.`
+                  : 'Serve almeno una seconda tappa.'}
               </p>
             </div>
             <Switch
               id="rientro"
               checked={giornata.itinerary.returns_to_start}
-              disabled={!partenza || aggiornaGiornata.isPending}
+              disabled={sequenza.tappe.length < 2 || aggiornaGiornata.isPending}
               onCheckedChange={(attivo) => {
                 aggiornaGiornata.mutate({
                   itineraryId: giornata.itinerary.id,

@@ -10,45 +10,52 @@ type Props = {
 };
 
 /**
- * Totale della giornata. Su telefono resta appoggiato in basso, sopra la
- * bottom navigation: il numero che conta deve stare sempre sotto gli occhi.
+ * Totale della giornata.
+ *
+ * Su telefono resta appoggiato in basso, sopra la barra di navigazione, e
+ * deve stare in una riga: nella prima versione i badge andavano a capo e il
+ * riquadro occupava un terzo dello schermo, coprendo le tappe che doveva
+ * riassumere. Tratte manuali e stimate sono segnalate già sulle tratte stesse,
+ * quindi qui compaiono solo da tablet in su; resta sempre visibile solo
+ * l'avviso che cambia il significato del totale: mancano dei chilometri.
  */
 export function RiepilogoGiornata({ totali, numeroTappe }: Props) {
   return (
     <section
       aria-label="Totale della giornata"
-      className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 border-y bg-background/95 backdrop-blur md:static md:inset-auto md:rounded-lg md:border"
+      className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-20 border-t bg-background/95 shadow-[0_-4px_12px_-6px_rgb(0_0_0/0.15)] backdrop-blur md:static md:inset-auto md:rounded-lg md:border md:shadow-none"
     >
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
+      <div className="flex items-center gap-3 px-4 py-2.5 md:py-3">
         <Route className="size-5 shrink-0 text-primary" aria-hidden />
 
-        <p className="flex items-baseline gap-2">
-          <span className="tabular text-2xl font-semibold leading-none">{km(totali.km)}</span>
-          {totali.minuti !== null ? (
-            <span className="tabular text-sm text-muted-foreground">{durata(totali.minuti)}</span>
-          ) : null}
+        <p className="flex min-w-0 items-baseline gap-2">
+          <span className="tabular text-xl font-semibold leading-none sm:text-2xl">
+            {km(totali.km)}
+          </span>
+          <span className="truncate text-xs text-muted-foreground sm:text-sm">
+            {totali.minuti !== null ? `${durata(totali.minuti)} · ` : ''}
+            {numeroTappe === 1 ? '1 tappa' : `${numeroTappe} tappe`}
+          </span>
         </p>
 
-        <p className="text-sm text-muted-foreground">
-          {numeroTappe === 1 ? '1 tappa' : `${numeroTappe} tappe`}
-        </p>
-
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {totali.tratteMancanti > 0 ? (
-            <Badge variant="outline" className="gap-1 border-warning text-warning">
+            <Badge
+              variant="outline"
+              className="gap-1 whitespace-nowrap border-warning text-warning"
+              title="Il totale non comprende queste tratte"
+            >
               <AlertTriangle className="size-3" aria-hidden />
-              {totali.tratteMancanti === 1
-                ? '1 tratta senza km'
-                : `${totali.tratteMancanti} tratte senza km`}
+              {totali.tratteMancanti} senza km
             </Badge>
           ) : null}
           {totali.tratteStimate > 0 ? (
-            <Badge variant="warning">
+            <Badge variant="warning" className="hidden whitespace-nowrap sm:inline-flex">
               {totali.tratteStimate === 1 ? '1 stimata' : `${totali.tratteStimate} stimate`}
             </Badge>
           ) : null}
           {totali.tratteManuali > 0 ? (
-            <Badge variant="secondary">
+            <Badge variant="secondary" className="hidden whitespace-nowrap sm:inline-flex">
               {totali.tratteManuali === 1 ? '1 manuale' : `${totali.tratteManuali} manuali`}
             </Badge>
           ) : null}

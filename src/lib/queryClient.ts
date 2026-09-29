@@ -38,11 +38,14 @@ export function createQueryClient(): QueryClient {
       },
     }),
     mutationCache: new MutationCache({
-      // Le mutazioni con onError proprio gestiscono il messaggio da sole.
+      // Toast di ripiego per gli errori che nessuno mostra. Non scatta se la
+      // mutazione ha un onError proprio, né se il componente mostra già
+      // l'errore dentro il form (meta.erroreMostrato): il login lo presentava
+      // due volte, nel riquadro rosso e in un toast.
       onError: (errore, _variabili, _contesto, mutazione) => {
-        if (!mutazione.options.onError) {
-          toast.error(messaggioErrore(errore));
-        }
+        if (mutazione.options.onError) return;
+        if (mutazione.meta?.erroreMostrato === true) return;
+        toast.error(messaggioErrore(errore));
       },
     }),
   });

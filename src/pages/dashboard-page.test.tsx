@@ -88,7 +88,7 @@ describe('DashboardPage', () => {
 
     expect(await screen.findByText('tratte senza km')).toBeInTheDocument();
     const mese = screen.getByRole('region', { name: `Totale ${meseAnno(new Date())}` });
-    expect(within(mese).getByText('1 giornata incompleta')).toBeInTheDocument();
+    expect(within(mese).getByText('1 incompleta')).toBeInTheDocument();
   });
 
   it('su un mese vuoto invita a cominciare', async () => {

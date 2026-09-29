@@ -28,6 +28,11 @@ const MESSAGGI_AUTH: Record<string, string> = {
   weak_password: 'La password è troppo debole: usa almeno 8 caratteri.',
   session_expired: 'La sessione è scaduta: accedi di nuovo.',
   signup_disabled: 'La registrazione è disabilitata: chiedi un account all’amministratore.',
+  email_provider_disabled:
+    'L’accesso con email è disattivato nel progetto Supabase: va riattivato dall’amministratore.',
+  user_banned: 'Questo account è sospeso: contatta l’amministratore.',
+  email_address_invalid: 'Indirizzo email non valido.',
+  validation_failed: 'Dati non validi: controlla email e password.',
 };
 
 const MESSAGGI_POSTGREST: Record<string, string> = {

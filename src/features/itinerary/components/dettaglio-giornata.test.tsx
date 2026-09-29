@@ -171,7 +171,7 @@ describe('DettaglioGiornata', () => {
     caricaGiornata.mockResolvedValue(giornataConDueTappe([]));
     renderConProvider(<DettaglioGiornata data={DATA} />);
 
-    expect(await screen.findByText('1 tratta senza km')).toBeInTheDocument();
+    expect(await screen.findByText('1 senza km')).toBeInTheDocument();
     expect(within(riepilogo()).getByText('0,0 km')).toBeInTheDocument();
   });
 
@@ -233,7 +233,9 @@ describe('DettaglioGiornata', () => {
     renderConProvider(<DettaglioGiornata data={DATA} />);
     await screen.findByText('Deposito');
 
-    await utente.click(screen.getByRole('button', { name: 'Elimina Deposito' }));
+    // L'eliminazione sta nel menu della tappa, non più in un pulsante a vista.
+    await utente.click(screen.getByRole('button', { name: 'Azioni per Deposito' }));
+    await utente.click(await screen.findByRole('menuitem', { name: 'Elimina' }));
 
     const dialogo = await screen.findByRole('alertdialog');
     expect(within(dialogo).getByText(/Eliminare “Deposito”/)).toBeInTheDocument();
@@ -253,7 +255,8 @@ describe('DettaglioGiornata', () => {
     renderConProvider(<DettaglioGiornata data={DATA} />);
     await screen.findByText('Deposito');
 
-    await utente.click(screen.getByRole('button', { name: 'Elimina Deposito' }));
+    await utente.click(screen.getByRole('button', { name: 'Azioni per Deposito' }));
+    await utente.click(await screen.findByRole('menuitem', { name: 'Elimina' }));
     const dialogo = await screen.findByRole('alertdialog');
     await utente.click(within(dialogo).getByRole('button', { name: 'Annulla' }));
 

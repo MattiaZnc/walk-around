@@ -22,6 +22,9 @@ import type { Stop } from '@/types/models';
 
 const ContestoMappa = React.createContext(false);
 
+/** Ordine delle chiamate alla mappa: serve a verificare l'inquadratura. */
+const chiamate: string[] = [];
+
 function richiedeContesto(nome: string) {
   return function Finto(props: { children?: React.ReactNode }) {
     const dentroLaMappa = React.useContext(ContestoMappa);
@@ -45,7 +48,15 @@ vi.mock('react-leaflet', () => ({
   Popup: richiedeContesto('Popup'),
   Polyline: richiedeContesto('Polyline'),
   Circle: richiedeContesto('Circle'),
-  useMap: () => ({ setView: vi.fn(), fitBounds: vi.fn() }),
+  useMap: () => ({
+    setView: vi.fn(() => chiamate.push('setView')),
+    fitBounds: vi.fn(() => chiamate.push('fitBounds')),
+    invalidateSize: vi.fn(() => chiamate.push('invalidateSize')),
+    whenReady: (callback: () => void) => {
+      callback();
+    },
+    getContainer: () => document.createElement('div'),
+  }),
 }));
 
 vi.mock('leaflet', () => ({
@@ -108,6 +119,25 @@ describe('MappaGiornata: componenti dentro il contenitore', () => {
     }).not.toThrow();
 
     expect(screen.queryByText(/precisione di circa/)).not.toBeInTheDocument();
+  });
+
+  it('rilegge le dimensioni del riquadro prima di inquadrare il giro', () => {
+    // Senza invalidateSize Leaflet calcolava lo zoom su dimensioni misurate
+    // prima che il layout fosse definitivo: per un giro di tre chilometri la
+    // mappa restava su mezza città.
+    chiamate.length = 0;
+    render(
+      <ThemeProvider>
+        <MappaGiornata
+          tappe={[tappa('a', 41.89, 12.49), tappa('b', 41.9, 12.48)]}
+          tratte={[]}
+        />
+      </ThemeProvider>,
+    );
+
+    const primoInquadramento = chiamate.indexOf('fitBounds');
+    expect(primoInquadramento).toBeGreaterThan(-1);
+    expect(chiamate.slice(0, primoInquadramento)).toContain('invalidateSize');
   });
 
   it('il finto riconosce davvero un componente fuori posto', () => {

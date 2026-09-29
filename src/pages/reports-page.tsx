@@ -5,7 +5,6 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -80,9 +79,7 @@ export default function ReportsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Periodo</CardTitle>
-          <CardDescription>
-            Scegli l’intervallo di date: utile per i rimborsi chilometrici.
-          </CardDescription>
+          <CardDescription>Per i rimborsi chilometrici.</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
@@ -212,10 +209,10 @@ export default function ReportsPage() {
                     <th scope="col" className="px-3 py-2 text-left font-medium">
                       Giorno
                     </th>
-                    <th scope="col" className="px-3 py-2 text-left font-medium">
+                    <th scope="col" className="hidden px-3 py-2 text-left font-medium sm:table-cell">
                       Mezzo
                     </th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                    <th scope="col" className="hidden px-3 py-2 text-right font-medium sm:table-cell">
                       Tappe
                     </th>
                     <th scope="col" className="px-3 py-2 text-right font-medium">
@@ -232,29 +229,43 @@ export default function ReportsPage() {
                     .map((giorno) => (
                       <tr key={giorno.itineraryId} className="border-t">
                         <td className="px-3 py-2">
+                          {/* Tutta la cella è il collegamento: su telefono un
+                              bersaglio di tre parole era difficile da prendere. */}
                           <Link
                             to={`/day/${giorno.data}`}
-                            className="font-medium underline-offset-4 hover:underline"
+                            className="-mx-3 -my-2 flex min-h-touch flex-col justify-center px-3 py-2 underline-offset-4 hover:underline sm:min-h-0"
                           >
-                            {dataBreve(giorno.data)}
+                            <span className="whitespace-nowrap font-medium">
+                              {dataBreve(giorno.data)}
+                              <span className="ml-2 hidden text-xs font-normal capitalize text-muted-foreground sm:inline">
+                                {giornoSettimana(giorno.data)}
+                              </span>
+                            </span>
+                            <span className="text-xs text-muted-foreground sm:hidden">
+                              {giorno.modalita === 'piedi' ? 'a piedi' : 'in auto'} ·{' '}
+                              {giorno.tappe} tappe
+                            </span>
                           </Link>
-                          <span className="ml-2 text-xs capitalize text-muted-foreground">
-                            {giornoSettimana(giorno.data)}
-                          </span>
                         </td>
-                        <td className="px-3 py-2 text-muted-foreground">
+                        <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell">
                           {giorno.modalita === 'piedi' ? 'a piedi' : 'in auto'}
                         </td>
-                        <td className="tabular px-3 py-2 text-right">{giorno.tappe}</td>
-                        <td className="tabular px-3 py-2 text-right text-muted-foreground">
+                        <td className="tabular hidden px-3 py-2 text-right sm:table-cell">
+                          {giorno.tappe}
+                        </td>
+                        <td className="tabular whitespace-nowrap px-3 py-2 text-right text-muted-foreground">
                           {giorno.minuti > 0 ? durata(giorno.minuti) : '—'}
                         </td>
-                        <td className="tabular px-3 py-2 text-right font-medium">
+                        <td className="tabular whitespace-nowrap px-3 py-2 text-right font-medium">
                           {km(giorno.km)}
                           {giorno.tratteStimate > 0 ? (
-                            <Badge variant="warning" className="ml-2">
-                              stim.
-                            </Badge>
+                            <span
+                              className="ml-1 text-warning"
+                              title="Contiene tratte stimate"
+                              aria-label="contiene tratte stimate"
+                            >
+                              *
+                            </span>
                           ) : null}
                         </td>
                       </tr>
@@ -262,17 +273,26 @@ export default function ReportsPage() {
                 </tbody>
                 <tfoot className="border-t-2 bg-muted/30 font-semibold">
                   <tr>
-                    <td className="px-3 py-2" colSpan={2}>
-                      Totale
+                    <td className="px-3 py-2">Totale</td>
+                    <td className="hidden sm:table-cell" />
+                    <td className="tabular hidden px-3 py-2 text-right sm:table-cell">
+                      {riepilogo.tappe}
                     </td>
-                    <td className="tabular px-3 py-2 text-right">{riepilogo.tappe}</td>
-                    <td className="tabular px-3 py-2 text-right">
+                    <td className="tabular whitespace-nowrap px-3 py-2 text-right">
                       {riepilogo.minuti > 0 ? durata(riepilogo.minuti) : '—'}
                     </td>
-                    <td className="tabular px-3 py-2 text-right">{km(riepilogo.km)}</td>
+                    <td className="tabular whitespace-nowrap px-3 py-2 text-right">
+                      {km(riepilogo.km)}
+                    </td>
                   </tr>
                 </tfoot>
               </table>
+              {giorni.some((giorno) => giorno.tratteStimate > 0) ? (
+                <p className="border-t px-3 py-2 text-xs text-muted-foreground">
+                  <span className="text-warning">*</span> contiene tratte stimate, non percorsi
+                  reali
+                </p>
+              ) : null}
             </div>
           ) : null}
         </>

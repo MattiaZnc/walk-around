@@ -73,6 +73,13 @@ export function FormTappa({ tappa, iniziali, inCorso, vicinoA, onSalva, onAnnull
     defaultValues: valoriIniziali(tappa, iniziali),
   });
 
+  const latitudine = form.watch('lat');
+  const longitudine = form.watch('lng');
+  // Aperta se c'è un errore da mostrare: un messaggio dentro una sezione
+  // chiusa non lo vede nessuno.
+  const haCoordinateIniziali =
+    Boolean(form.formState.errors.lat) || Boolean(form.formState.errors.lng);
+
   return (
     <Form {...form}>
       <form
@@ -137,38 +144,48 @@ export function FormTappa({ tappa, iniziali, inCorso, vicinoA, onSalva, onAnnull
           )}
         />
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField
-            control={form.control}
-            name="lat"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Latitudine</FormLabel>
-                <FormControl>
-                  <Input inputMode="decimal" placeholder="45,4642" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        {/* Le coordinate le compila la ricerca: tenerle sempre in vista
+            allungava il form di due campi che quasi nessuno tocca a mano. */}
+        <details className="group rounded-lg border px-3 py-2" open={haCoordinateIniziali}>
+          <summary className="flex min-h-touch cursor-pointer list-none items-center justify-between gap-2 text-sm sm:min-h-0 sm:py-1">
+            <span className="font-medium">Coordinate</span>
+            <span className="text-xs text-muted-foreground">
+              {latitudine && longitudine ? `${latitudine}, ${longitudine}` : 'facoltative'}
+            </span>
+          </summary>
+          <div className="mt-3 grid gap-4 pb-2 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="lat"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Latitudine</FormLabel>
+                  <FormControl>
+                    <Input inputMode="decimal" placeholder="45,4642" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-          <FormField
-            control={form.control}
-            name="lng"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Longitudine</FormLabel>
-                <FormControl>
-                  <Input inputMode="decimal" placeholder="9,1896" {...field} />
-                </FormControl>
-                <FormDescription>
-                  Con le coordinate la tappa appare sulla mappa e i km si calcolano da soli.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+            <FormField
+              control={form.control}
+              name="lng"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Longitudine</FormLabel>
+                  <FormControl>
+                    <Input inputMode="decimal" placeholder="9,1896" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    Con le coordinate la tappa appare sulla mappa e i km si calcolano da soli.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </details>
 
         <FormField
           control={form.control}

@@ -89,21 +89,52 @@ function isGeometria(valore: unknown): valore is Geometria {
 /** Inquadra automaticamente tutti i punti del giro. */
 function AdattaVista({ punti }: { punti: [number, number][] }) {
   const mappa = useMap();
-  // Stringa stabile: evita di rifare il fit a ogni render con gli stessi punti.
+  // Stringa stabile: evita di rifare l'inquadratura a ogni render con gli
+  // stessi punti, che annullerebbe lo zoom fatto a mano dall'utente.
   const firma = punti.map(([lat, lng]) => `${lat},${lng}`).join('|');
 
   React.useEffect(() => {
     if (punti.length === 0) return;
 
-    if (punti.length === 1) {
-      const solo = punti[0];
-      if (solo) mappa.setView(solo, 15);
-      return;
-    }
+    const inquadra = () => {
+      // Leaflet misura il riquadro quando viene creato. Se in quel momento il
+      // layout non è ancora definitivo (caricamento dei font, pannelli che si
+      // assestano) la misura è sbagliata e fitBounds calcola lo zoom su un
+      // riquadro diverso da quello visibile: la mappa restava su mezza Roma
+      // per un giro di tre chilometri. invalidateSize rilegge le dimensioni.
+      mappa.invalidateSize();
 
-    mappa.fitBounds(L.latLngBounds(punti), { padding: [40, 40], maxZoom: 16 });
+      if (punti.length === 1) {
+        const solo = punti[0];
+        if (solo) mappa.setView(solo, 15);
+        return;
+      }
+      mappa.fitBounds(L.latLngBounds(punti), { padding: [32, 32], maxZoom: 16 });
+    };
+
+    mappa.whenReady(inquadra);
+    // Un secondo tentativo a layout assestato: costa niente e copre i casi in
+    // cui il primo arriva troppo presto.
+    const timer = window.setTimeout(inquadra, 250);
+    return () => {
+      window.clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `firma` rappresenta `punti`
   }, [firma, mappa]);
+
+  // Se il riquadro cambia dimensione (rotazione del telefono, colonne su
+  // desktop) Leaflet va avvisato, altrimenti restano zone grigie.
+  React.useEffect(() => {
+    const contenitore = mappa.getContainer();
+    if (typeof ResizeObserver === 'undefined') return;
+    const osservatore = new ResizeObserver(() => {
+      mappa.invalidateSize();
+    });
+    osservatore.observe(contenitore);
+    return () => {
+      osservatore.disconnect();
+    };
+  }, [mappa]);
 
   return null;
 }
@@ -175,7 +206,7 @@ export function MappaGiornata({ tappe, tratte, posizione, className }: Props) {
   const tile = configurazioneTile(resolvedTheme === 'dark');
 
   return (
-    <div className={cn('overflow-hidden rounded-lg border', className)}>
+    <div className={cn('overflow-hidden rounded-xl border', className)}>
       <MapContainer
         center={puntiPerInquadratura[0] ?? CENTRO_PREDEFINITO}
         zoom={13}

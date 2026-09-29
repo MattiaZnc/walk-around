@@ -17,6 +17,8 @@ import type { AppError } from '@/lib/errors';
 export function useLogin(): UseMutationResult<void, AppError, LoginInput> {
   return useMutation({
     mutationKey: ['auth', 'login'],
+    // L'errore compare già nel form.
+    meta: { erroreMostrato: true },
     mutationFn: async ({ email, password }: LoginInput) => {
       await accedi(email, password);
     },
@@ -33,6 +35,8 @@ export function useLogout(): UseMutationResult<void, AppError, void> {
 export function useRichiestaReset(): UseMutationResult<void, AppError, RichiestaResetInput> {
   return useMutation({
     mutationKey: ['auth', 'reset-request'],
+    // L'errore compare già nel form.
+    meta: { erroreMostrato: true },
     mutationFn: async ({ email }: RichiestaResetInput) => {
       await richiediResetPassword(email);
     },
@@ -42,6 +46,8 @@ export function useRichiestaReset(): UseMutationResult<void, AppError, Richiesta
 export function useImpostaNuovaPassword(): UseMutationResult<void, AppError, { password: string }> {
   return useMutation({
     mutationKey: ['auth', 'set-password'],
+    // L'errore compare già nel form.
+    meta: { erroreMostrato: true },
     mutationFn: async ({ password }: { password: string }) => {
       await impostaNuovaPassword(password);
     },
@@ -53,6 +59,8 @@ export function useCambioPassword(
 ): UseMutationResult<void, AppError, CambioPasswordInput> {
   return useMutation({
     mutationKey: ['auth', 'change-password'],
+    // L'errore compare già nel form.
+    meta: { erroreMostrato: true },
     mutationFn: async ({ passwordAttuale, password }: CambioPasswordInput) => {
       await cambiaPassword(email, passwordAttuale, password);
     },

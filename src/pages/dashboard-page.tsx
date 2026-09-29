@@ -95,28 +95,31 @@ export default function DashboardPage() {
         </Button>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      {/* Affiancati anche su telefono: impilati spingevano l'elenco dei giorni
+          sotto la piega dello schermo. */}
+      <div className="grid grid-cols-2 gap-3">
         <RiepilogoPeriodoRiquadro
           etichetta={`Totale ${meseAnno(mese)}`}
           riepilogo={riepilogoMese}
           primario
+          compatto
+          className={settimanaNelMese ? undefined : 'col-span-2'}
         />
         {settimanaNelMese ? (
-          <RiepilogoPeriodoRiquadro etichetta="Questa settimana" riepilogo={riepilogoSettimana} />
+          <RiepilogoPeriodoRiquadro
+            etichetta="Questa settimana"
+            riepilogo={riepilogoSettimana}
+            compatto
+          />
         ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Button asChild>
-          <Link to={`/day/${oggi}`}>
-            <Plus aria-hidden />
-            Pianifica oggi
-          </Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <Link to="/report">Report ed export</Link>
-        </Button>
-      </div>
+      <Button asChild className="w-full sm:w-auto">
+        <Link to={`/day/${oggi}`}>
+          <Plus aria-hidden />
+          Pianifica oggi
+        </Link>
+      </Button>
 
       {totaliQuery.isPending ? (
         <div className="space-y-2" aria-busy>

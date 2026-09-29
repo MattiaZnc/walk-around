@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { DettaglioGiornata } from '@/features/itinerary/components/dettaglio-giornata';
-import { dataDaISO, dataLunga, isoDaData, oggiISO } from '@/lib/format';
+import { annoCorrente, dataDaISO, dataLunga, dataSenzaAnno, isoDaData, oggiISO } from '@/lib/format';
 import { useTitoloPagina } from '@/lib/use-titolo-pagina';
 
 const FORMATO_ATTESO = /^\d{4}-\d{2}-\d{2}$/;
@@ -40,61 +40,59 @@ export default function DayPage() {
   const oggi = oggiISO();
 
   return (
-    <div className="container max-w-3xl py-4 sm:py-6">
-      <header className="mb-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              void navigate(`/day/${precedente}`);
-            }}
-            aria-label={`Giorno precedente, ${dataLunga(precedente)}`}
-          >
-            <ChevronLeft aria-hidden />
-          </Button>
+    <div className="container max-w-3xl py-3 sm:py-6">
+      {/* Intestazione compatta: su telefono ogni riga in alto è una riga di
+          tappe in meno. Il titolo stesso apre il calendario, quindi non serve
+          un selettore di data separato. */}
+      <header className="mb-3 flex items-center gap-1 sm:mb-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            void navigate(`/day/${precedente}`);
+          }}
+          aria-label={`Giorno precedente, ${dataLunga(precedente)}`}
+        >
+          <ChevronLeft aria-hidden />
+        </Button>
 
-          <div className="min-w-0 flex-1 text-center">
-            <h1 className="truncate text-lg font-semibold capitalize sm:text-2xl">
-              {dataLunga(date)}
+        <div className="min-w-0 flex-1 text-center">
+          <label className="relative inline-flex min-h-touch max-w-full cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 hover:bg-accent focus-within:ring-2 focus-within:ring-ring sm:min-h-0 sm:py-1">
+            <h1 className="truncate text-base font-semibold capitalize sm:text-xl">
+              {annoCorrente(date) ? dataSenzaAnno(date) : dataLunga(date)}
             </h1>
-            {date !== oggi ? (
-              <Button variant="link" asChild className="h-auto p-0 text-xs">
-                <Link to={`/day/${oggi}`}>Torna a oggi</Link>
-              </Button>
-            ) : (
-              <p className="text-xs text-muted-foreground">Oggi</p>
-            )}
-          </div>
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              void navigate(`/day/${successivo}`);
-            }}
-            aria-label={`Giorno successivo, ${dataLunga(successivo)}`}
-          >
-            <ChevronRight aria-hidden />
-          </Button>
-        </div>
-
-        {/* Selettore data: permette di saltare a giorni lontani */}
-        <div className="flex items-center justify-center gap-2">
-          <CalendarDays className="size-4 text-muted-foreground" aria-hidden />
-          <label htmlFor="scelta-data" className="sr-only">
-            Vai a una data
+            <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="sr-only">Scegli un altro giorno</span>
+            {/* Input nativo invisibile sopra il titolo: il tocco apre il
+                calendario del telefono, che è quello a cui l'utente è abituato. */}
+            <input
+              type="date"
+              value={date}
+              onChange={(evento) => {
+                if (evento.target.value) void navigate(`/day/${evento.target.value}`);
+              }}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
           </label>
-          <input
-            id="scelta-data"
-            type="date"
-            value={date}
-            onChange={(evento) => {
-              if (evento.target.value) void navigate(`/day/${evento.target.value}`);
-            }}
-            className="min-h-touch rounded-md border border-input bg-background px-3 text-sm sm:h-9 sm:min-h-0"
-          />
+          {date !== oggi ? (
+            <Button variant="link" asChild className="h-auto p-0 text-xs">
+              <Link to={`/day/${oggi}`}>Torna a oggi</Link>
+            </Button>
+          ) : (
+            <p className="text-xs font-medium text-primary">Oggi</p>
+          )}
         </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            void navigate(`/day/${successivo}`);
+          }}
+          aria-label={`Giorno successivo, ${dataLunga(successivo)}`}
+        >
+          <ChevronRight aria-hidden />
+        </Button>
       </header>
 
       <DettaglioGiornata key={date} data={date} />

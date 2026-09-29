@@ -3,7 +3,6 @@ import { NavLink, Outlet } from 'react-router-dom';
 
 import { AvvisoOffline } from '@/components/layout/avviso-offline';
 import { MenuUtente } from '@/components/layout/menu-utente';
-import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { env } from '@/lib/env';
 import { cn } from '@/lib/utils';
 
@@ -37,16 +36,13 @@ export function AppLayout() {
 
       <AvvisoOffline />
       {/* Header: unico su mobile, ridotto su desktop dove c'è la sidebar */}
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
-        <div className="flex h-14 items-center justify-between px-4">
+      <header className="sticky top-0 z-30 border-b bg-background/95 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
+        <div className="flex h-12 items-center justify-between pl-4 pr-1">
           <span className="flex items-center gap-2 font-semibold">
             <RouteIcon className="size-5 text-primary" aria-hidden />
             {env.VITE_APP_NAME}
           </span>
-          <div className="flex items-center gap-1">
-            <ThemeToggle />
-            <MenuUtente />
-          </div>
+          <MenuUtente />
         </div>
       </header>
 
@@ -79,10 +75,7 @@ export function AppLayout() {
             ))}
           </nav>
 
-          <div className="mt-auto space-y-1">
-            <div className="px-1">
-              <ThemeToggle />
-            </div>
+          <div className="mt-auto">
             <MenuUtente etichettaVisibile />
           </div>
         </aside>

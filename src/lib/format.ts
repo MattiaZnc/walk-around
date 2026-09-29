@@ -76,3 +76,13 @@ export function dataMedia(iso: string): string {
 export function giornoSettimana(iso: string): string {
   return format(dataDaISO(iso), 'EEEE', { locale: it });
 }
+
+/** Es. "martedì 29 settembre": l'anno si omette quando è quello in corso. */
+export function dataSenzaAnno(iso: string): string {
+  return format(dataDaISO(iso), 'EEEE d MMMM', { locale: it });
+}
+
+/** true se la data cade nell'anno corrente. */
+export function annoCorrente(iso: string): boolean {
+  return iso.slice(0, 4) === String(new Date().getFullYear());
+}

@@ -79,7 +79,7 @@ export function RicercaLuogo({ vicinoA, onScelta }: Props) {
             setIndiceAttivo(-1);
           }}
           onKeyDown={onKeyDown}
-          placeholder="Es. Colosseo, oppure Via Roma 1 Milano"
+          placeholder="Es. Colosseo o Via Roma 1"
           className="pl-9 pr-10"
           autoComplete="off"
           role="combobox"

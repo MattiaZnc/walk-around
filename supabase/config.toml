@@ -216,8 +216,10 @@ web3 = 30
 # secret = ""
 
 [auth.email]
-# Nessuna registrazione via email dal frontend (vedi docs/supabase-setup.md).
-enable_signup = false
+# ATTENZIONE: nella CLI questa opzione accende o spegne il provider email, cioè
+# anche il login. Deve restare true. La registrazione pubblica si blocca con
+# `enable_signup = false` nella sezione [auth] qui sopra.
+enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
