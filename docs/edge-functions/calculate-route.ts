@@ -26,6 +26,32 @@ export type Geometria = {
   coordinates: [number, number][]; // [lng, lat], ordine GeoJSON
 };
 
+/**
+ * Una manovra del percorso, in forma strutturata: il testo italiano lo compone
+ * il client (src/features/itinerary/lib/navigazione.ts), così la formulazione
+ * è la stessa qualunque provider abbia risposto.
+ */
+export type Manovra = {
+  tipo: 'partenza' | 'svolta' | 'prosegui' | 'rotonda' | 'inversione' | 'arrivo';
+  direzione:
+    | 'sinistra'
+    | 'destra'
+    | 'leggermente-sinistra'
+    | 'leggermente-destra'
+    | 'nettamente-sinistra'
+    | 'nettamente-destra'
+    | 'dritto'
+    | null;
+  /** Nome della strada che si imbocca; stringa vuota se senza nome. */
+  strada: string;
+  /** Uscita da prendere, solo per le rotonde. */
+  uscita: number | null;
+  lat: number;
+  lng: number;
+  /** Metri dall'inizio del percorso al punto della manovra. */
+  progressivaM: number;
+};
+
 export type Tratto = {
   distanceKm: number;
   durationMin: number | null;
@@ -34,6 +60,8 @@ export type Tratto = {
   isEstimate: boolean;
   /** Provider che ha risposto: utile in UI e nei log. */
   provider: string;
+  /** Indicazioni svolta per svolta, solo se richieste con `istruzioni`. */
+  manovre?: Manovra[];
 };
 
 export type RichiestaPercorso = {
@@ -41,6 +69,8 @@ export type RichiestaPercorso = {
   coppie: { from: Coordinate; to: Coordinate }[];
   /** Mezzo di trasporto. */
   profilo?: 'auto' | 'piedi' | 'bici';
+  /** true per ricevere anche le manovre: servono al navigatore, non ai km. */
+  istruzioni?: boolean;
 };
 
 export type RispostaPercorso = {
@@ -199,8 +229,126 @@ export type ProviderPercorsi = {
   nome: string;
   /** false quando manca la configurazione necessaria (es. API key). */
   disponibile: () => boolean;
-  calcola: (da: Coordinate, a: Coordinate, profilo: Profilo) => Promise<Tratto>;
+  /** `istruzioni` chiede anche le manovre: le usa solo il navigatore. */
+  calcola: (
+    da: Coordinate,
+    a: Coordinate,
+    profilo: Profilo,
+    istruzioni?: boolean,
+  ) => Promise<Tratto>;
 };
+
+type Direzione = Manovra['direzione'];
+
+const DIREZIONI_OSRM: Record<string, Direzione> = {
+  left: 'sinistra',
+  right: 'destra',
+  'slight left': 'leggermente-sinistra',
+  'slight right': 'leggermente-destra',
+  'sharp left': 'nettamente-sinistra',
+  'sharp right': 'nettamente-destra',
+  straight: 'dritto',
+};
+
+type PassoOsrm = {
+  distance?: number;
+  name?: string;
+  maneuver?: { type?: string; modifier?: string; exit?: number; location?: [number, number] };
+};
+
+/**
+ * Traduce i passi di OSRM in manovre. Si scartano quelli che non chiedono di
+ * fare nulla (avvisi, corsie, uscita dalla rotonda già annunciata entrando).
+ */
+export function manovreDaOsrm(passi: PassoOsrm[]): Manovra[] {
+  const manovre: Manovra[] = [];
+  let progressiva = 0;
+
+  for (const passo of passi) {
+    const inizio = progressiva;
+    progressiva += passo.distance ?? 0;
+
+    const tipoOsrm = passo.maneuver?.type ?? '';
+    const luogo = passo.maneuver?.location;
+    if (!luogo) continue;
+    if (['notification', 'use lane', 'exit roundabout', 'exit rotary'].includes(tipoOsrm)) {
+      continue;
+    }
+
+    const modificatore = passo.maneuver?.modifier ?? '';
+    const direzione = DIREZIONI_OSRM[modificatore] ?? null;
+
+    let tipo: Manovra['tipo'];
+    if (tipoOsrm === 'depart') tipo = 'partenza';
+    else if (tipoOsrm === 'arrive') tipo = 'arrivo';
+    else if (tipoOsrm.includes('roundabout') || tipoOsrm === 'rotary') tipo = 'rotonda';
+    else if (modificatore === 'uturn') tipo = 'inversione';
+    else if (direzione === 'dritto' || direzione === null) tipo = 'prosegui';
+    else tipo = 'svolta';
+
+    manovre.push({
+      tipo,
+      direzione: tipo === 'svolta' || tipo === 'partenza' ? direzione : null,
+      strada: passo.name ?? '',
+      uscita: tipo === 'rotonda' ? (passo.maneuver?.exit ?? null) : null,
+      lng: luogo[0],
+      lat: luogo[1],
+      progressivaM: Math.round(inizio),
+    });
+  }
+
+  return manovre;
+}
+
+type PassoOrs = {
+  distance?: number;
+  name?: string;
+  type?: number;
+  exit_number?: number;
+  way_points?: [number, number];
+};
+
+/** Codici dei tipi di passo di OpenRouteService (documentazione ORS). */
+const TIPI_ORS: Record<number, { tipo: Manovra['tipo']; direzione: Direzione }> = {
+  0: { tipo: 'svolta', direzione: 'sinistra' },
+  1: { tipo: 'svolta', direzione: 'destra' },
+  2: { tipo: 'svolta', direzione: 'nettamente-sinistra' },
+  3: { tipo: 'svolta', direzione: 'nettamente-destra' },
+  4: { tipo: 'svolta', direzione: 'leggermente-sinistra' },
+  5: { tipo: 'svolta', direzione: 'leggermente-destra' },
+  6: { tipo: 'prosegui', direzione: null },
+  7: { tipo: 'rotonda', direzione: null },
+  9: { tipo: 'inversione', direzione: null },
+  10: { tipo: 'arrivo', direzione: null },
+  11: { tipo: 'partenza', direzione: null },
+  12: { tipo: 'svolta', direzione: 'leggermente-sinistra' },
+  13: { tipo: 'svolta', direzione: 'leggermente-destra' },
+};
+
+export function manovreDaOrs(passi: PassoOrs[], coordinate: [number, number][]): Manovra[] {
+  const manovre: Manovra[] = [];
+  let progressiva = 0;
+
+  for (const passo of passi) {
+    const inizio = progressiva;
+    progressiva += passo.distance ?? 0;
+
+    const voce = TIPI_ORS[passo.type ?? -1];
+    const punto = coordinate[passo.way_points?.[0] ?? -1];
+    if (!voce || !punto) continue;
+
+    manovre.push({
+      ...voce,
+      strada: passo.name && passo.name !== '-' ? passo.name : '',
+      uscita: voce.tipo === 'rotonda' ? (passo.exit_number ?? null) : null,
+      lng: punto[0],
+      lat: punto[1],
+      progressivaM: Math.round(inizio),
+    });
+  }
+
+  return manovre;
+}
 
 // ---------------------------------------------------------------------------
 // OpenRouteService — richiede ORS_API_KEY (piano gratuito: 2000 richieste/giorno)
@@ -214,7 +362,10 @@ const PROFILI_ORS: Record<Profilo, string> = {
 
 type RispostaOrs = {
   features?: {
-    properties?: { summary?: { distance?: number; duration?: number } };
+    properties?: {
+      summary?: { distance?: number; duration?: number };
+      segments?: { steps?: PassoOrs[] }[];
+    };
     geometry?: { type?: string; coordinates?: [number, number][] };
   }[];
 };
@@ -224,7 +375,7 @@ export const providerOrs: ProviderPercorsi = {
 
   disponibile: () => !!Deno.env.get('ORS_API_KEY'),
 
-  async calcola(da, a, profilo) {
+  async calcola(da, a, profilo, istruzioni = false) {
     const chiave = Deno.env.get('ORS_API_KEY');
     if (!chiave) throw new Error('ORS_API_KEY non configurata');
 
@@ -241,6 +392,7 @@ export const providerOrs: ProviderPercorsi = {
             [da.lng, da.lat],
             [a.lng, a.lat],
           ],
+          instructions: istruzioni,
         }),
       },
     );
@@ -268,6 +420,14 @@ export const providerOrs: ProviderPercorsi = {
       geometry,
       isEstimate: false,
       provider: 'openrouteservice',
+      ...(istruzioni && coordinate
+        ? {
+            manovre: manovreDaOrs(
+              percorso?.properties?.segments?.flatMap((segmento) => segmento.steps ?? []) ?? [],
+              coordinate,
+            ),
+          }
+        : {}),
     };
   },
 };
@@ -303,6 +463,7 @@ type RispostaOsrm = {
     distance?: number;
     duration?: number;
     geometry?: { type?: string; coordinates?: [number, number][] };
+    legs?: { steps?: PassoOsrm[] }[];
   }[];
 };
 
@@ -311,13 +472,13 @@ export const providerOsrm: ProviderPercorsi = {
 
   disponibile: () => true,
 
-  async calcola(da, a, profilo) {
+  async calcola(da, a, profilo, istruzioni = false) {
     const predefinito = SERVER_OSRM[profilo];
     const base = Deno.env.get(VARIABILE_OSRM[profilo]) ?? predefinito.base;
     const url =
       `${base}/route/v1/${predefinito.percorso}/` +
       `${da.lng},${da.lat};${a.lng},${a.lat}` +
-      '?overview=full&geometries=geojson&alternatives=false&steps=false';
+      `?overview=full&geometries=geojson&alternatives=false&steps=${String(istruzioni)}`;
 
     const risposta = await fetchConTimeout(url, {
       headers: { 'User-Agent': 'walk-around/1.0 (app itinerari personali)' },
@@ -349,6 +510,9 @@ export const providerOsrm: ProviderPercorsi = {
       geometry,
       isEstimate: false,
       provider: 'osrm',
+      ...(istruzioni
+        ? { manovre: manovreDaOsrm(percorso?.legs?.flatMap((tappa) => tappa.steps ?? []) ?? []) }
+        : {}),
     };
   },
 };
@@ -429,9 +593,10 @@ function chiaveCache(
   da: { lat: number; lng: number },
   a: { lat: number; lng: number },
   profilo: Profilo,
+  istruzioni: boolean,
 ): string {
   const arrotonda = (valore: number) => valore.toFixed(5);
-  return `${profilo}:${arrotonda(da.lat)},${arrotonda(da.lng)}->${arrotonda(a.lat)},${arrotonda(a.lng)}`;
+  return `${profilo}${istruzioni ? '+istruzioni' : ''}:${arrotonda(da.lat)},${arrotonda(da.lng)}->${arrotonda(a.lat)},${arrotonda(a.lng)}`;
 }
 
 function profiloValido(valore: string | undefined): Profilo {
@@ -458,6 +623,7 @@ Deno.serve(async (richiesta) => {
   }
 
   const profilo = profiloValido(corpo.profilo);
+  const istruzioni = corpo.istruzioni === true;
   const provider = providerInOrdine();
 
   const tratti = await Promise.all(
@@ -466,7 +632,7 @@ Deno.serve(async (richiesta) => {
         return { errore: 'Coordinate mancanti o non valide' };
       }
 
-      const chiave = chiaveCache(coppia.from, coppia.to, profilo);
+      const chiave = chiaveCache(coppia.from, coppia.to, profilo, istruzioni);
       const inCache = cache.leggi(chiave);
       if (inCache) return inCache;
 
@@ -475,11 +641,13 @@ Deno.serve(async (richiesta) => {
       // I provider vengono provati in ordine: il primo che risponde vince.
       for (const candidato of provider) {
         try {
-          const tratto = await candidato.calcola(coppia.from, coppia.to, profilo);
+          const tratto = await candidato.calcola(coppia.from, coppia.to, profilo, istruzioni);
           cache.scrivi(chiave, tratto);
           return tratto;
         } catch (errore) {
-          problemi.push(`${candidato.nome}: ${errore instanceof Error ? errore.message : 'errore'}`);
+          problemi.push(
+            `${candidato.nome}: ${errore instanceof Error ? errore.message : 'errore'}`,
+          );
         }
       }
 

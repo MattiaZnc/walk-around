@@ -21,9 +21,10 @@ function chiaveCache(
   da: { lat: number; lng: number },
   a: { lat: number; lng: number },
   profilo: Profilo,
+  istruzioni: boolean,
 ): string {
   const arrotonda = (valore: number) => valore.toFixed(5);
-  return `${profilo}:${arrotonda(da.lat)},${arrotonda(da.lng)}->${arrotonda(a.lat)},${arrotonda(a.lng)}`;
+  return `${profilo}${istruzioni ? '+istruzioni' : ''}:${arrotonda(da.lat)},${arrotonda(da.lng)}->${arrotonda(a.lat)},${arrotonda(a.lng)}`;
 }
 
 function profiloValido(valore: string | undefined): Profilo {
@@ -50,6 +51,7 @@ Deno.serve(async (richiesta) => {
   }
 
   const profilo = profiloValido(corpo.profilo);
+  const istruzioni = corpo.istruzioni === true;
   const provider = providerInOrdine();
 
   const tratti = await Promise.all(
@@ -58,7 +60,7 @@ Deno.serve(async (richiesta) => {
         return { errore: 'Coordinate mancanti o non valide' };
       }
 
-      const chiave = chiaveCache(coppia.from, coppia.to, profilo);
+      const chiave = chiaveCache(coppia.from, coppia.to, profilo, istruzioni);
       const inCache = cache.leggi(chiave);
       if (inCache) return inCache;
 
@@ -67,11 +69,13 @@ Deno.serve(async (richiesta) => {
       // I provider vengono provati in ordine: il primo che risponde vince.
       for (const candidato of provider) {
         try {
-          const tratto = await candidato.calcola(coppia.from, coppia.to, profilo);
+          const tratto = await candidato.calcola(coppia.from, coppia.to, profilo, istruzioni);
           cache.scrivi(chiave, tratto);
           return tratto;
         } catch (errore) {
-          problemi.push(`${candidato.nome}: ${errore instanceof Error ? errore.message : 'errore'}`);
+          problemi.push(
+            `${candidato.nome}: ${errore instanceof Error ? errore.message : 'errore'}`,
+          );
         }
       }
 

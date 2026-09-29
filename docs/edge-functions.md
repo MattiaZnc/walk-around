@@ -23,6 +23,13 @@ Due funzioni, entrambe in `supabase/functions`:
 3. **Stima** — linea d'aria × 1,3 e velocità media. Non fallisce mai e marca il
    risultato con `is_estimate`, che in interfaccia diventa il badge "stimata".
 
+Con `"istruzioni": true` nel corpo la risposta include anche `manovre`, le
+indicazioni svolta per svolta usate dal navigatore ("Guidami"). Sono dati
+strutturati (tipo, direzione, strada, punto, metri dall'inizio): il testo
+italiano lo compone l'app in `src/features/itinerary/lib/navigazione.ts`. Una
+Edge Function di versione precedente ignora il parametro: il navigatore
+funziona lo stesso, ma mostra solo la linea del percorso senza indicazioni.
+
 > Il server dimostrativo `router.project-osrm.org` conosce **solo
 > l'automobile**: se gli si chiede un percorso a piedi risponde comunque con
 > quello in auto. Fra Colosseo e Villa Borghese dava "7,51 km in 12 minuti" a

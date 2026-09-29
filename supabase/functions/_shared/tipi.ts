@@ -14,6 +14,32 @@ export type Geometria = {
   coordinates: [number, number][]; // [lng, lat], ordine GeoJSON
 };
 
+/**
+ * Una manovra del percorso, in forma strutturata: il testo italiano lo compone
+ * il client (src/features/itinerary/lib/navigazione.ts), così la formulazione
+ * è la stessa qualunque provider abbia risposto.
+ */
+export type Manovra = {
+  tipo: 'partenza' | 'svolta' | 'prosegui' | 'rotonda' | 'inversione' | 'arrivo';
+  direzione:
+    | 'sinistra'
+    | 'destra'
+    | 'leggermente-sinistra'
+    | 'leggermente-destra'
+    | 'nettamente-sinistra'
+    | 'nettamente-destra'
+    | 'dritto'
+    | null;
+  /** Nome della strada che si imbocca; stringa vuota se senza nome. */
+  strada: string;
+  /** Uscita da prendere, solo per le rotonde. */
+  uscita: number | null;
+  lat: number;
+  lng: number;
+  /** Metri dall'inizio del percorso al punto della manovra. */
+  progressivaM: number;
+};
+
 export type Tratto = {
   distanceKm: number;
   durationMin: number | null;
@@ -22,6 +48,8 @@ export type Tratto = {
   isEstimate: boolean;
   /** Provider che ha risposto: utile in UI e nei log. */
   provider: string;
+  /** Indicazioni svolta per svolta, solo se richieste con `istruzioni`. */
+  manovre?: Manovra[];
 };
 
 export type RichiestaPercorso = {
@@ -29,6 +57,8 @@ export type RichiestaPercorso = {
   coppie: { from: Coordinate; to: Coordinate }[];
   /** Mezzo di trasporto. */
   profilo?: 'auto' | 'piedi' | 'bici';
+  /** true per ricevere anche le manovre: servono al navigatore, non ai km. */
+  istruzioni?: boolean;
 };
 
 export type RispostaPercorso = {

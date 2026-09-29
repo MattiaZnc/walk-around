@@ -1,10 +1,11 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapPinOff } from 'lucide-react';
+import { LocateFixed, MapPinOff } from 'lucide-react';
 import * as React from 'react';
 import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
 
 import { useTheme } from '@/components/layout/theme-provider';
+import { Button } from '@/components/ui/button';
 import type { Geometria } from '@/features/itinerary/api/percorsi.api';
 import { distanzaLeggibile, type Posizione } from '@/features/itinerary/lib/prossimita';
 import { oraDiArrivo } from '@/features/itinerary/lib/prossimita-formato';
@@ -19,8 +20,16 @@ type Props = {
   tratte: Tratta[];
   /** Posizione corrente, quando "Seguimi" è attivo. */
   posizione?: Posizione | null;
+  /**
+   * Percorso del navigatore ([lat, lng]), quando la guida è attiva: la mappa
+   * si ingrandisce, segue la posizione e disegna la strada da fare.
+   */
+  percorsoGuida?: [number, number][] | null;
   className?: string;
 };
+
+/** Blu del navigatore: lo stesso del puntino della posizione, distinto dal verde del giro. */
+const BLU_GUIDA = '#2563eb';
 
 /** Centro di ripiego quando nessuna tappa ha coordinate (centro Italia). */
 const CENTRO_PREDEFINITO: [number, number] = [41.9028, 12.4964];
@@ -122,8 +131,17 @@ function AdattaVista({ punti }: { punti: [number, number][] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `firma` rappresenta `punti`
   }, [firma, mappa]);
 
-  // Se il riquadro cambia dimensione (rotazione del telefono, colonne su
-  // desktop) Leaflet va avvisato, altrimenti restano zone grigie.
+  return null;
+}
+
+/**
+ * Se il riquadro cambia dimensione (rotazione del telefono, colonne su
+ * desktop, mappa che si allunga in guida) Leaflet va avvisato, altrimenti
+ * restano zone grigie.
+ */
+function SeguiDimensioni() {
+  const mappa = useMap();
+
   React.useEffect(() => {
     const contenitore = mappa.getContainer();
     if (typeof ResizeObserver === 'undefined') return;
@@ -139,8 +157,51 @@ function AdattaVista({ punti }: { punti: [number, number][] }) {
   return null;
 }
 
-export function MappaGiornata({ tappe, tratte, posizione, className }: Props) {
+/**
+ * Durante la guida la mappa resta centrata sulla posizione, come in un
+ * navigatore. Se l'utente la sposta con il dito smette di seguirlo finché non
+ * tocca "Ricentra": strapparla via mentre si guarda altrove è irritante.
+ */
+function SeguiPosizione({
+  posizione,
+  segui,
+  onSmettiDiSeguire,
+}: {
+  posizione: Posizione | null;
+  segui: boolean;
+  onSmettiDiSeguire: () => void;
+}) {
+  const mappa = useMap();
+
+  React.useEffect(() => {
+    mappa.on('dragstart', onSmettiDiSeguire);
+    return () => {
+      mappa.off('dragstart', onSmettiDiSeguire);
+    };
+  }, [mappa, onSmettiDiSeguire]);
+
+  React.useEffect(() => {
+    if (!segui || !posizione) return;
+    mappa.setView([posizione.lat, posizione.lng], Math.max(mappa.getZoom(), 17), {
+      animate: true,
+    });
+  }, [mappa, segui, posizione]);
+
+  return null;
+}
+
+export function MappaGiornata({ tappe, tratte, posizione, percorsoGuida, className }: Props) {
   const { resolvedTheme } = useTheme();
+  const inGuida = percorsoGuida !== undefined && percorsoGuida !== null;
+  const [segui, setSegui] = React.useState(true);
+  const smettiDiSeguire = React.useCallback(() => {
+    setSegui(false);
+  }, []);
+
+  // Ogni nuova guida riparte centrata sulla posizione.
+  React.useEffect(() => {
+    if (inGuida) setSegui(true);
+  }, [inGuida]);
 
   const tappeConCoordinate = tappe
     .map((tappa, indice) => ({ tappa, numero: indice + 1 }))
@@ -206,92 +267,145 @@ export function MappaGiornata({ tappe, tratte, posizione, className }: Props) {
   const tile = configurazioneTile(resolvedTheme === 'dark');
 
   return (
-    <div className={cn('overflow-hidden rounded-xl border', className)}>
-      <MapContainer
-        center={puntiPerInquadratura[0] ?? CENTRO_PREDEFINITO}
-        zoom={13}
-        scrollWheelZoom={false}
-        className={cn(
-          'h-[260px] w-full sm:h-[360px] md:h-[calc(100dvh-14rem)]',
-          // Il filtro agisce solo sulle mattonelle: marker e tracciato
-          // restano dei loro colori (vedi index.css).
-          tile.filtraPerTemaScuro && 'mappa-tema-scuro',
-        )}
-        // Leaflet non è navigabile da tastiera in modo utile: il contenuto
-        // informativo resta disponibile nell'elenco tappe accanto.
-        aria-label="Mappa dell'itinerario"
+    <div
+      className={cn(
+        'relative overflow-hidden rounded-xl border',
+        // Il filtro agisce solo sulle mattonelle: marker e tracciato
+        // restano dei loro colori (vedi index.css).
+        tile.filtraPerTemaScuro && 'mappa-tema-scuro',
+        className,
+      )}
+    >
+      {/* Altezza sul contenitore e non su MapContainer: react-leaflet applica
+          className solo alla creazione, e in guida la mappa deve allungarsi. */}
+      <div
+        className={
+          inGuida
+            ? // In guida la mappa è lo strumento principale: più spazio.
+              'h-[45dvh] md:h-[calc(100dvh-14rem)]'
+            : 'h-[260px] sm:h-[360px] md:h-[calc(100dvh-14rem)]'
+        }
       >
-        <TileLayer url={tile.url} attribution={tile.attribuzione} maxZoom={tile.maxZoom} />
+        <MapContainer
+          center={puntiPerInquadratura[0] ?? CENTRO_PREDEFINITO}
+          zoom={13}
+          scrollWheelZoom={false}
+          className="h-full w-full"
+          // Leaflet non è navigabile da tastiera in modo utile: il contenuto
+          // informativo resta disponibile nell'elenco tappe accanto.
+          aria-label="Mappa dell'itinerario"
+        >
+          <TileLayer url={tile.url} attribution={tile.attribuzione} maxZoom={tile.maxZoom} />
 
-        <AdattaVista punti={puntiPerInquadratura} />
+          <SeguiDimensioni />
 
-        {percorsi.map((percorso) => (
-          <Polyline
-            key={percorso.chiave}
-            positions={percorso.punti}
-            pathOptions={{
-              color: 'hsl(var(--primary))',
-              weight: 4,
-              opacity: 0.85,
-              // Tratteggio per i percorsi stimati: si vede subito che non è
-              // un tracciato stradale reale.
-              dashArray: percorso.stimato ? '6 8' : undefined,
-            }}
-          />
-        ))}
+          {/* In guida l'inquadratura la decide la posizione, non il giro. */}
+          {inGuida ? (
+            <SeguiPosizione
+              posizione={posizione ?? null}
+              segui={segui}
+              onSmettiDiSeguire={smettiDiSeguire}
+            />
+          ) : (
+            <AdattaVista punti={puntiPerInquadratura} />
+          )}
 
-        {/* Posizione corrente: il cerchio rappresenta l'incertezza del
-            segnale, così si capisce quanto fidarsi del puntino. */}
-        {posizione ? (
-          <>
-            <Circle
-              center={[posizione.lat, posizione.lng]}
-              radius={posizione.accuratezza}
+          {percorsi.map((percorso) => (
+            <Polyline
+              key={percorso.chiave}
+              positions={percorso.punti}
               pathOptions={{
-                color: '#2563eb',
-                fillColor: '#3b82f6',
-                fillOpacity: 0.15,
-                weight: 1,
+                color: 'hsl(var(--primary))',
+                weight: 4,
+                // In guida il giro resta sullo sfondo: conta la strada da fare ora.
+                opacity: inGuida ? 0.35 : 0.85,
+                // Tratteggio per i percorsi stimati: si vede subito che non è
+                // un tracciato stradale reale.
+                dashArray: percorso.stimato ? '6 8' : undefined,
               }}
             />
-            <Marker
-              position={[posizione.lat, posizione.lng]}
-              icon={iconaPosizione()}
-              title="La tua posizione"
-            />
-          </>
-        ) : null}
+          ))}
 
-        {tappeConCoordinate.map(({ tappa, numero }) => (
-          <Marker
-            key={tappa.id}
-            position={[tappa.lat, tappa.lng]}
-            icon={iconaNumerata(numero, tappa.is_start, tappa.reached_at !== null)}
-            title={`${numero}. ${tappa.label}${tappa.is_start ? ' (partenza)' : ''}${
-              tappa.reached_at !== null ? ' — raggiunta' : ''
-            }`}
-          >
-            <Popup>
-              <p className="font-semibold">
-                {numero}. {tappa.label}
-              </p>
-              {tappa.is_start ? (
-                <p className="text-xs font-medium">Punto di partenza della giornata</p>
-              ) : null}
-              {tappa.reached_at !== null ? (
-                <p className="text-xs font-medium">
-                  Raggiunta
-                  {oraDiArrivo(tappa.reached_at) ? ` alle ${oraDiArrivo(tappa.reached_at)}` : ''}
+          {inGuida ? (
+            <>
+              {/* Bordo bianco sotto la linea: resta leggibile sopra qualunque strada. */}
+              <Polyline
+                positions={percorsoGuida}
+                pathOptions={{ color: '#ffffff', weight: 9, opacity: 0.9 }}
+              />
+              <Polyline
+                positions={percorsoGuida}
+                pathOptions={{ color: BLU_GUIDA, weight: 6, opacity: 0.95 }}
+              />
+            </>
+          ) : null}
+
+          {/* Posizione corrente: il cerchio rappresenta l'incertezza del
+            segnale, così si capisce quanto fidarsi del puntino. */}
+          {posizione ? (
+            <>
+              <Circle
+                center={[posizione.lat, posizione.lng]}
+                radius={posizione.accuratezza}
+                pathOptions={{
+                  color: '#2563eb',
+                  fillColor: '#3b82f6',
+                  fillOpacity: 0.15,
+                  weight: 1,
+                }}
+              />
+              <Marker
+                position={[posizione.lat, posizione.lng]}
+                icon={iconaPosizione()}
+                title="La tua posizione"
+              />
+            </>
+          ) : null}
+
+          {tappeConCoordinate.map(({ tappa, numero }) => (
+            <Marker
+              key={tappa.id}
+              position={[tappa.lat, tappa.lng]}
+              icon={iconaNumerata(numero, tappa.is_start, tappa.reached_at !== null)}
+              title={`${numero}. ${tappa.label}${tappa.is_start ? ' (partenza)' : ''}${
+                tappa.reached_at !== null ? ' — raggiunta' : ''
+              }`}
+            >
+              <Popup>
+                <p className="font-semibold">
+                  {numero}. {tappa.label}
                 </p>
-              ) : null}
-              {tappa.address ? <p className="text-xs">{tappa.address}</p> : null}
-              {tappa.planned_time ? (
-                <p className="text-xs">Orario previsto: {oraBreve(tappa.planned_time)}</p>
-              ) : null}
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
+                {tappa.is_start ? (
+                  <p className="text-xs font-medium">Punto di partenza della giornata</p>
+                ) : null}
+                {tappa.reached_at !== null ? (
+                  <p className="text-xs font-medium">
+                    Raggiunta
+                    {oraDiArrivo(tappa.reached_at) ? ` alle ${oraDiArrivo(tappa.reached_at)}` : ''}
+                  </p>
+                ) : null}
+                {tappa.address ? <p className="text-xs">{tappa.address}</p> : null}
+                {tappa.planned_time ? (
+                  <p className="text-xs">Orario previsto: {oraBreve(tappa.planned_time)}</p>
+                ) : null}
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      </div>
+
+      {inGuida && !segui ? (
+        <Button
+          size="sm"
+          onClick={() => {
+            setSegui(true);
+          }}
+          className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 rounded-full shadow-md"
+        >
+          <LocateFixed aria-hidden />
+          Ricentra
+        </Button>
+      ) : null}
 
       {/* Riepilogo testuale: la mappa da sola non è accessibile */}
       <ol className="sr-only">

@@ -1,4 +1,13 @@
-import { AlertCircle, Copy, Flag, MoreHorizontal, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import {
+  AlertCircle,
+  Copy,
+  Flag,
+  MoreHorizontal,
+  Navigation,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react';
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -35,6 +44,7 @@ import {
   type ModalitaViaggio,
 } from '@/features/itinerary/api/percorsi.api';
 import { useGiornata, vistaGiornata } from '@/features/itinerary/api/use-giornata';
+import { useNavigazione } from '@/features/itinerary/api/use-navigazione';
 import { tratteDaCalcolare, useRicalcolaTratte } from '@/features/itinerary/api/use-ricalcolo';
 import {
   useAggiornaTappa,
@@ -54,7 +64,9 @@ import { DialogoDuplica } from '@/features/itinerary/components/dialogo-duplica'
 import { ElencoTappe } from '@/features/itinerary/components/elenco-tappe';
 import { FormTappa } from '@/features/itinerary/components/form-tappa';
 import { MappaGiornata } from '@/features/itinerary/components/mappa-giornata';
+import { ApriInMappe, PannelloGuida } from '@/features/itinerary/components/pannello-guida';
 import { Seguimi } from '@/features/itinerary/components/seguimi';
+import { destinazioneGuida, rientroCompletato } from '@/features/itinerary/lib/navigazione';
 import type { Posizione } from '@/features/itinerary/lib/prossimita';
 import { RiepilogoGiornata } from '@/features/itinerary/components/riepilogo-giornata';
 import {
@@ -64,6 +76,7 @@ import {
 import type { TappaInput, TrattaInput } from '@/features/itinerary/schemas/itinerary.schemas';
 import { puntoDiPartenza, useProfilo } from '@/features/profile/api/use-profilo';
 import { dataLunga } from '@/lib/format';
+import { useSchermoAcceso } from '@/lib/use-schermo-acceso';
 import type { Stop } from '@/types/models';
 
 type StatoPannello =
@@ -108,6 +121,51 @@ export function DettaglioGiornata({ data }: { data: string }) {
   const giornata = giornataQuery.data ?? null;
   const { sequenza, totali } = vistaGiornata(giornata);
   const partenza = puntoDiPartenza(profiloQuery.data);
+
+  // Navigatore: parte solo dal pulsante "Guidami", con Seguimi acceso.
+  const [guidaRichiesta, setGuidaRichiesta] = React.useState(false);
+  const inGuida = guidaRichiesta && seguimiAttivo;
+  const modalita: ModalitaViaggio = modalitaValida(giornata?.itinerary.travel_mode ?? 'auto');
+  const destinazione = destinazioneGuida(
+    sequenza.tappe,
+    giornata?.itinerary.returns_to_start ?? false,
+  );
+  // All'avvio della guida la mappa va in cima allo schermo: così mappa e
+  // indicazioni si vedono insieme sopra le barre fisse in basso.
+  const colonnaMappa = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (inGuida) colonnaMappa.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [inGuida]);
+
+  const navigazione = useNavigazione({
+    attiva: inGuida,
+    destinazione: destinazione
+      ? { id: destinazione.tappa.id, lat: destinazione.tappa.lat, lng: destinazione.tappa.lng }
+      : null,
+    posizione,
+    modalita,
+  });
+  useSchermoAcceso(inGuida);
+
+  // Fine della guida: finite le tappe, o tornati alla partenza. Le singole
+  // tappe le segna Seguimi; qui si decide solo quando smettere di guidare.
+  const idDestinazione = destinazione?.tappa.id ?? null;
+  const versoPartenza = destinazione?.rientro ?? false;
+  React.useEffect(() => {
+    if (!inGuida) return;
+    if (!destinazione) {
+      setGuidaRichiesta(false);
+      toast.success('Giro completato: tutte le tappe sono state raggiunte.');
+      return;
+    }
+    if (destinazione.rientro && posizione && rientroCompletato(destinazione.tappa, posizione)) {
+      setGuidaRichiesta(false);
+      toast.success('Sei tornato al punto di partenza. Buon riposo!');
+      if ('vibrate' in navigator) navigator.vibrate([120, 60, 120]);
+    }
+    // `destinazione` è rappresentata da id e rientro: l'oggetto cambia a ogni render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inGuida, idDestinazione, versoPartenza, posizione]);
 
   const [note, setNote] = React.useState('');
   React.useEffect(() => {
@@ -299,8 +357,6 @@ export function DettaglioGiornata({ data }: { data: string }) {
       )
       .find((coordinata): coordinata is Coordinate => coordinata !== null) ?? coordinateProfilo;
 
-  const modalita: ModalitaViaggio = modalitaValida(giornata?.itinerary.travel_mode ?? 'auto');
-
   /**
    * Ricalcola le tratte. `soloMancanti` distingue i due casi d'uso:
    * dopo una modifica si completa ciò che manca, col pulsante si rifà tutto
@@ -475,8 +531,16 @@ export function DettaglioGiornata({ data }: { data: string }) {
       {/* Su desktop elenco e mappa sono affiancati; su telefono la mappa sta
           sopra l'elenco, così si vede il giro prima dei dettagli. */}
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start">
-        <div className="relative space-y-2 md:sticky md:top-4 md:order-2">
-          <MappaGiornata tappe={sequenza.tappe} tratte={sequenza.tratte} posizione={posizione} />
+        <div
+          ref={colonnaMappa}
+          className="relative scroll-mt-16 space-y-2 md:sticky md:top-4 md:order-2"
+        >
+          <MappaGiornata
+            tappe={sequenza.tappe}
+            tratte={sequenza.tratte}
+            posizione={posizione}
+            percorsoGuida={inGuida ? (navigazione.percorso?.punti ?? []) : null}
+          />
           {/* Seguimi sta sulla mappa, dove si guarda durante il giro. Ha senso
               solo se almeno una tappa ha coordinate da confrontare. */}
           {sequenza.tappe.some((tappa) => tappa.lat !== null) ? (
@@ -484,9 +548,46 @@ export function DettaglioGiornata({ data }: { data: string }) {
               sovrapposto
               tappe={sequenza.tappe}
               attivo={seguimiAttivo}
-              onCambioAttivo={setSeguimiAttivo}
+              onCambioAttivo={(attivo) => {
+                setSeguimiAttivo(attivo);
+                // Senza posizione il navigatore non ha senso.
+                if (!attivo) setGuidaRichiesta(false);
+              }}
               onArrivo={gestisciArrivo}
               onPosizione={setPosizione}
+              mostraStato={!inGuida}
+              azioni={
+                destinazione ? (
+                  <>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setGuidaRichiesta(true);
+                      }}
+                    >
+                      <Navigation aria-hidden />
+                      {destinazione.rientro ? 'Guidami alla partenza' : 'Guidami'}
+                    </Button>
+                    <ApriInMappe destinazione={destinazione.tappa} modalita={modalita} />
+                  </>
+                ) : null
+              }
+            />
+          ) : null}
+          {inGuida && destinazione ? (
+            <PannelloGuida
+              navigazione={navigazione}
+              destinazione={{
+                etichetta: destinazione.rientro
+                  ? `${destinazione.tappa.label} (rientro)`
+                  : `${String(sequenza.tappe.indexOf(destinazione.tappa) + 1)}. ${destinazione.tappa.label}`,
+                coordinate: destinazione.tappa,
+              }}
+              modalita={modalita}
+              posizione={posizione}
+              onTermina={() => {
+                setGuidaRichiesta(false);
+              }}
             />
           ) : null}
         </div>
