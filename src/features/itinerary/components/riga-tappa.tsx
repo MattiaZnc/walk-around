@@ -170,7 +170,10 @@ export function RigaTappa({
           }
           aria-pressed={raggiunta}
           title={raggiunta ? 'Annulla: non ancora raggiunta' : 'Segna come raggiunta'}
-          className={cn('shrink-0', raggiunta ? 'text-reached-foreground' : 'text-muted-foreground')}
+          className={cn(
+            'shrink-0',
+            raggiunta ? 'text-reached-foreground' : 'text-muted-foreground',
+          )}
         >
           {raggiunta ? <Check aria-hidden /> : <Circle aria-hidden />}
         </Button>

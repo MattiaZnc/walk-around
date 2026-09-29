@@ -2,7 +2,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
-import { Link } from 'react-router-dom';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -104,11 +103,12 @@ export function LoginForm() {
           Accedi
         </Button>
 
-        <div className="text-center">
-          <Button variant="link" asChild className="h-auto p-0 text-sm">
-            <Link to="/reset-password">Password dimenticata?</Link>
-          </Button>
-        </div>
+        {/* Nessun "password dimenticata": gli account e le password li gestisce
+            l'amministratore. La pagina /reset-password resta per i link di
+            recupero che l'amministratore può inviare dalla dashboard. */}
+        <p className="text-center text-xs text-muted-foreground">
+          Password dimenticata? Chiedi all’amministratore di reimpostarla.
+        </p>
       </form>
     </Form>
   );

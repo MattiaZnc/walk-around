@@ -4,7 +4,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { DettaglioGiornata } from '@/features/itinerary/components/dettaglio-giornata';
-import { annoCorrente, dataDaISO, dataLunga, dataSenzaAnno, isoDaData, oggiISO } from '@/lib/format';
+import {
+  annoCorrente,
+  dataDaISO,
+  dataLunga,
+  dataSenzaAnno,
+  isoDaData,
+  oggiISO,
+} from '@/lib/format';
 import { useTitoloPagina } from '@/lib/use-titolo-pagina';
 
 const FORMATO_ATTESO = /^\d{4}-\d{2}-\d{2}$/;
@@ -57,7 +64,7 @@ export default function DayPage() {
         </Button>
 
         <div className="min-w-0 flex-1 text-center">
-          <label className="relative inline-flex min-h-touch max-w-full cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 hover:bg-accent focus-within:ring-2 focus-within:ring-ring sm:min-h-0 sm:py-1">
+          <label className="relative inline-flex min-h-touch max-w-full cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 focus-within:ring-2 focus-within:ring-ring hover:bg-accent sm:min-h-0 sm:py-1">
             <h1 className="truncate text-base font-semibold capitalize sm:text-xl">
               {annoCorrente(date) ? dataSenzaAnno(date) : dataLunga(date)}
             </h1>

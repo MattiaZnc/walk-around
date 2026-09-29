@@ -17,6 +17,7 @@ const DashboardPage = lazy(() => import('@/pages/dashboard-page'));
 const DayPage = lazy(() => import('@/pages/day-page'));
 const ReportsPage = lazy(() => import('@/pages/reports-page'));
 const ProfilePage = lazy(() => import('@/pages/profile-page'));
+const TraguardiPage = lazy(() => import('@/pages/traguardi-page'));
 const NotFoundPage = lazy(() => import('@/pages/not-found-page'));
 
 function conSuspense(elemento: React.ReactNode): React.ReactNode {
@@ -49,6 +50,7 @@ const routes: RouteObject[] = [
           // Scorciatoia: /day porta al giorno corrente.
           { path: '/day', element: <Navigate to={`/day/${oggiISO()}`} replace /> },
           { path: '/report', element: conSuspense(<ReportsPage />) },
+          { path: '/traguardi', element: conSuspense(<TraguardiPage />) },
           { path: '/profilo', element: conSuspense(<ProfilePage />) },
           { path: '*', element: conSuspense(<NotFoundPage />) },
         ],

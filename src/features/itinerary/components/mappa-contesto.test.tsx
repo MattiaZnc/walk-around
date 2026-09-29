@@ -128,10 +128,7 @@ describe('MappaGiornata: componenti dentro il contenitore', () => {
     chiamate.length = 0;
     render(
       <ThemeProvider>
-        <MappaGiornata
-          tappe={[tappa('a', 41.89, 12.49), tappa('b', 41.9, 12.48)]}
-          tratte={[]}
-        />
+        <MappaGiornata tappe={[tappa('a', 41.89, 12.49), tappa('b', 41.9, 12.48)]} tratte={[]} />
       </ThemeProvider>,
     );
 

@@ -306,6 +306,14 @@ export type Database = {
       invalida_tratte_non_adiacenti: { Args: { p_itinerary_id: string }; Returns: number };
       owns_itinerary: { Args: { p_itinerary_id: string }; Returns: boolean };
       reorder_stops: { Args: { p_itinerary_id: string; p_ordered_ids: string[] }; Returns: number };
+      riepilogo_obiettivi: {
+        Args: { p_oggi?: string };
+        Returns: {
+          giornate_attive: number;
+          km_percorsi: number;
+          tappe_raggiunte: number;
+        }[];
+      };
     };
     Enums: {
       [_ in never]: never;

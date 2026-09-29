@@ -1,8 +1,9 @@
-import { CalendarDays, FileText, Route as RouteIcon } from 'lucide-react';
+import { CalendarDays, FileText, Route as RouteIcon, Trophy } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 import { AvvisoOffline } from '@/components/layout/avviso-offline';
 import { MenuUtente } from '@/components/layout/menu-utente';
+import { AvvisoNuoviTraguardi } from '@/features/traguardi/components/avviso-nuovi-traguardi';
 import { env } from '@/lib/env';
 import { cn } from '@/lib/utils';
 
@@ -12,13 +13,10 @@ type VoceNav = {
   icona: typeof CalendarDays;
 };
 
-/**
- * Solo le destinazioni di uso quotidiano. Il profilo sta nel menu utente:
- * ci si entra per cambiare l'indirizzo di partenza o la password, non ogni
- * giorno, e in fondo allo schermo lo spazio è prezioso.
- */
+/** Destinazioni principali, le stesse nella barra in basso e nella sidebar. */
 const VOCI: VoceNav[] = [
   { to: '/', etichetta: 'Giorni', icona: CalendarDays },
+  { to: '/traguardi', etichetta: 'Traguardi', icona: Trophy },
   { to: '/report', etichetta: 'Report', icona: FileText },
 ];
 
@@ -35,6 +33,9 @@ export function AppLayout() {
       </a>
 
       <AvvisoOffline />
+      {/* Qui e non in una pagina: il traguardo si sblocca segnando una tappa,
+          e l'avviso deve arrivare ovunque ci si trovi. */}
+      <AvvisoNuoviTraguardi />
       {/* Header: unico su mobile, ridotto su desktop dove c'è la sidebar */}
       <header className="sticky top-0 z-30 border-b bg-background/95 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
         <div className="flex h-12 items-center justify-between pl-4 pr-1">

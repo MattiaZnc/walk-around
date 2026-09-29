@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useUtenteCorrente } from '@/features/auth/api/auth-provider';
 import { useAggiornaProfilo } from '@/features/profile/api/use-aggiorna-profilo';
 import { useProfilo } from '@/features/profile/api/use-profilo';
-import { FormCambioPassword } from '@/features/profile/components/form-cambio-password';
 import { FormProfilo } from '@/features/profile/components/form-profilo';
 import { useTitoloPagina } from '@/lib/use-titolo-pagina';
 
@@ -80,18 +79,6 @@ export default function ProfilePage() {
               </AlertDescription>
             </Alert>
           ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Password</CardTitle>
-          <CardDescription>
-            Serve la password attuale: è la verifica che sei tu a fare il cambio.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FormCambioPassword email={utente.email ?? ''} />
         </CardContent>
       </Card>
     </div>

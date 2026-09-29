@@ -209,10 +209,16 @@ export default function ReportsPage() {
                     <th scope="col" className="px-3 py-2 text-left font-medium">
                       Giorno
                     </th>
-                    <th scope="col" className="hidden px-3 py-2 text-left font-medium sm:table-cell">
+                    <th
+                      scope="col"
+                      className="hidden px-3 py-2 text-left font-medium sm:table-cell"
+                    >
                       Mezzo
                     </th>
-                    <th scope="col" className="hidden px-3 py-2 text-right font-medium sm:table-cell">
+                    <th
+                      scope="col"
+                      className="hidden px-3 py-2 text-right font-medium sm:table-cell"
+                    >
                       Tappe
                     </th>
                     <th scope="col" className="px-3 py-2 text-right font-medium">
@@ -242,8 +248,8 @@ export default function ReportsPage() {
                               </span>
                             </span>
                             <span className="text-xs text-muted-foreground sm:hidden">
-                              {giorno.modalita === 'piedi' ? 'a piedi' : 'in auto'} ·{' '}
-                              {giorno.tappe} tappe
+                              {giorno.modalita === 'piedi' ? 'a piedi' : 'in auto'} · {giorno.tappe}{' '}
+                              tappe
                             </span>
                           </Link>
                         </td>

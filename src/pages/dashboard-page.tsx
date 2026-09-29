@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { riepiloga, type TotaliGiorno } from '@/features/itinerary/api/totali.api';
 import { NESSUN_GIORNO, useTotaliPeriodo } from '@/features/itinerary/api/use-totali';
 import { RiepilogoPeriodoRiquadro } from '@/features/itinerary/components/riepilogo-periodo';
+import { ProssimiTraguardi } from '@/features/traguardi/components/prossimi-traguardi';
 import { dataBreve, durata, giornoSettimana, isoDaData, km, meseAnno, oggiISO } from '@/lib/format';
 import { useTitoloPagina } from '@/lib/use-titolo-pagina';
 
@@ -113,6 +114,8 @@ export default function DashboardPage() {
           />
         ) : null}
       </div>
+
+      <ProssimiTraguardi />
 
       <Button asChild className="w-full sm:w-auto">
         <Link to={`/day/${oggi}`}>
