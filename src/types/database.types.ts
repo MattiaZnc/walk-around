@@ -160,6 +160,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      saved_starts: {
+        Row: {
+          address: string | null;
+          created_at: string;
+          id: string;
+          label: string;
+          lat: number | null;
+          lng: number | null;
+          user_id: string;
+        };
+        Insert: {
+          address?: string | null;
+          created_at?: string;
+          id?: string;
+          label: string;
+          lat?: number | null;
+          lng?: number | null;
+          user_id?: string;
+        };
+        Update: {
+          address?: string | null;
+          created_at?: string;
+          id?: string;
+          label?: string;
+          lat?: number | null;
+          lng?: number | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       stops: {
         Row: {
           address: string | null;

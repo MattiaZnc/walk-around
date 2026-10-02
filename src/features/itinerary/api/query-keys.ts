@@ -12,3 +12,7 @@ export const chiaviProfilo = {
   tutte: ['profilo'] as const,
   corrente: () => ['profilo', 'corrente'] as const,
 } as const;
+
+export const chiaviPartenze = {
+  tutte: ['partenze'] as const,
+} as const;

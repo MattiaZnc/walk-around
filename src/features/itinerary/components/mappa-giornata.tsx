@@ -1,5 +1,8 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import '@maplibre/maplibre-gl-leaflet';
+import type maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { LocateFixed, MapPinOff } from 'lucide-react';
 import * as React from 'react';
 import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
@@ -10,7 +13,7 @@ import type { Geometria } from '@/features/itinerary/api/percorsi.api';
 import { distanzaLeggibile, type Posizione } from '@/features/itinerary/lib/prossimita';
 import { oraDiArrivo } from '@/features/itinerary/lib/prossimita-formato';
 import type { Tratta } from '@/features/itinerary/lib/sequenza';
-import { configurazioneTile } from '@/features/itinerary/lib/tile-mappa';
+import { ATTRIBUZIONE_OSM, configurazioneTile } from '@/features/itinerary/lib/tile-mappa';
 import { durata, km, oraBreve } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { Stop } from '@/types/models';
@@ -28,60 +31,166 @@ type Props = {
   className?: string;
 };
 
-/** Blu del navigatore: lo stesso del puntino della posizione, distinto dal verde del giro. */
-const BLU_GUIDA = '#2563eb';
+/**
+ * Colori ispirati a Google Maps, per sembrare familiari a colpo d'occhio:
+ * percorso blu con bordo più scuro, tappe come spilli rossi, posizione come
+ * puntino blu con alone.
+ */
+const COLORI = {
+  percorso: '#4285f4',
+  bordoPercorso: '#1967d2',
+  percorsoSecondario: '#9aa0a6',
+  tappa: '#ea4335',
+  bordoTappa: '#b31412',
+  partenza: '#3c4043',
+  raggiunta: '#34a853',
+  bordoRaggiunta: '#137333',
+  posizione: '#1a73e8',
+} as const;
 
 /** Centro di ripiego quando nessuna tappa ha coordinate (centro Italia). */
 const CENTRO_PREDEFINITO: [number, number] = [41.9028, 12.4964];
 
 /**
- * Marker numerato disegnato come HTML: un'icona immagine per ogni numero
- * richiederebbe file separati, e i `divIcon` restano nitidi su schermi retina.
+ * Spillo numerato disegnato come SVG: resta nitido su schermi retina e non
+ * servono immagini separate per ogni numero. La punta indica il luogo esatto,
+ * come su Google Maps.
  */
 function iconaNumerata(numero: number, partenza: boolean, raggiunta: boolean): L.DivIcon {
   // La partenza si distingue a colpo d'occhio: è il punto da cui si misurano
-  // i chilometri, non una tappa qualsiasi. Le tappe raggiunte mostrano una
-  // spunta al posto del numero.
-  const colore = raggiunta
-    ? 'hsl(var(--reached-foreground))'
+  // i chilometri. Le tappe raggiunte diventano verdi con una spunta.
+  const [riempimento, bordo] = raggiunta
+    ? [COLORI.raggiunta, COLORI.bordoRaggiunta]
     : partenza
-      ? 'hsl(var(--foreground))'
-      : 'hsl(var(--primary))';
+      ? [COLORI.partenza, '#202124']
+      : [COLORI.tappa, COLORI.bordoTappa];
 
-  // Spunta disegnata come SVG: un carattere di testo cambia forma da un
-  // dispositivo all'altro e non si allinea al centro.
   const contenuto = raggiunta
-    ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
-    : String(numero);
+    ? '<path d="M11 15.5l3.5 3.5 7-7.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'
+    : `<text x="16" y="16" dy=".36em" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif" font-weight="700" font-size="${numero > 9 ? 12 : 14}">${String(numero)}</text>`;
 
   return L.divIcon({
     className: 'marker-tappa',
-    html: `<span style="
-      display:flex;align-items:center;justify-content:center;
-      width:28px;height:28px;border-radius:9999px;
-      background:${colore};color:${raggiunta ? 'hsl(var(--reached))' : 'hsl(var(--background))'};
-      font:600 13px/1 system-ui,sans-serif;
-      box-shadow:0 1px 4px rgb(0 0 0 / .4);
-      border:${partenza ? '3px solid hsl(var(--primary))' : '2px solid hsl(var(--background))'};
-    ">${contenuto}</span>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    popupAnchor: [0, -14],
+    html: `<svg width="32" height="42" viewBox="0 0 32 42" style="display:block;filter:drop-shadow(0 2px 2px rgb(0 0 0 / .35))">
+      <path d="M16 1C7.7 1 1 7.6 1 15.8c0 10.6 13.1 23.6 13.7 24.2a1.8 1.8 0 0 0 2.6 0C17.9 39.4 31 26.4 31 15.8 31 7.6 24.3 1 16 1z" fill="${riempimento}" stroke="${bordo}" stroke-width="1.5"/>
+      ${contenuto}
+    </svg>`,
+    iconSize: [32, 42],
+    iconAnchor: [16, 41],
+    popupAnchor: [0, -38],
   });
 }
 
-/** Punto blu della posizione corrente, distinto dai marker delle tappe. */
+/** Puntino blu con alone, come la posizione su Google Maps. */
 function iconaPosizione(): L.DivIcon {
   return L.divIcon({
     className: 'marker-posizione',
     html: `<span style="
-      display:block;width:16px;height:16px;border-radius:9999px;
-      background:#2563eb;border:3px solid #fff;
-      box-shadow:0 0 0 1px rgb(0 0 0 / .3);
+      display:block;width:20px;height:20px;border-radius:9999px;
+      background:${COLORI.posizione};border:3px solid #fff;
+      box-shadow:0 0 0 6px rgb(26 115 232 / .2),0 1px 4px rgb(0 0 0 / .4);
     "></span>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
   });
+}
+
+/**
+ * Mappa vettoriale (MapLibre) come sfondo di Leaflet: marker e percorsi
+ * restano gli stessi, cambia solo il disegno delle strade. Se lo stile non si
+ * carica (rete assente, servizio giù) si avvisa il genitore, che torna alle
+ * mattonelle di OpenStreetMap.
+ */
+/**
+ * Gli stili di OpenFreeMap scrivono i nomi in inglese ("Rome"): si passa al
+ * nome italiano dove esiste, altrimenti a quello locale. Solo le scritte che
+ * usano il nome: numeri civici e sigle delle strade restano come sono.
+ */
+function nomiInItaliano(libre: maplibregl.Map) {
+  for (const strato of libre.getStyle().layers) {
+    if (strato.type !== 'symbol') continue;
+    const testo: unknown = libre.getLayoutProperty(strato.id, 'text-field');
+    if (!JSON.stringify(testo ?? null).includes('"name')) continue;
+    libre.setLayoutProperty(strato.id, 'text-field', [
+      'coalesce',
+      ['get', 'name:it'],
+      ['get', 'name'],
+    ]);
+  }
+}
+
+/**
+ * Ricolora lo stile chiaro con la tavolozza di Google Maps: fondo grigio
+ * chiaro, strade bianche con bordo grigio, solo le grandi arterie in giallo,
+ * acqua azzurra e parchi verde tenue. Lo stile originale colora di giallo
+ * quasi ogni strada e, a zoom di città, diventa una ragnatela che copre
+ * tappe e percorso.
+ */
+const TAVOLOZZA_GOOGLE: [RegExp, string, string][] = [
+  [/^background$/, 'background-color', '#f2f3f5'],
+  [/^(park|landcover_wood|landcover_grass)$/, 'fill-color', '#cdebd3'],
+  [/^landuse_residential$/, 'fill-color', '#eceef1'],
+  [/^water$/, 'fill-color', '#a3d1f5'],
+  [/^waterway_/, 'line-color', '#a3d1f5'],
+  [/^building$/, 'fill-color', '#e3e5ea'],
+  [/_motorway(_link)?_casing$/, 'line-color', '#e2b45a'],
+  [/_motorway(_link)?$/, 'line-color', '#fcd77f'],
+  [/_casing$/, 'line-color', '#d5d8de'],
+  [
+    /^(road|tunnel|bridge)_(link|minor|street|service_track|secondary_tertiary|trunk_primary)$/,
+    'line-color',
+    '#ffffff',
+  ],
+];
+
+function aspettoTipoGoogle(libre: maplibregl.Map) {
+  for (const strato of libre.getStyle().layers) {
+    // Il primo modello che corrisponde vince: l'ordine dell'elenco conta.
+    const voce = TAVOLOZZA_GOOGLE.find(([modello]) => modello.test(strato.id));
+    if (!voce) continue;
+    const [, proprieta, colore] = voce;
+    try {
+      libre.setPaintProperty(strato.id, proprieta, colore);
+    } catch {
+      // Proprietà non adatta al tipo di strato: lo si lascia com'è.
+    }
+  }
+}
+
+function SfondoVettoriale({
+  stile,
+  chiaro,
+  onErrore,
+}: {
+  stile: string;
+  chiaro: boolean;
+  onErrore: () => void;
+}) {
+  const mappa = useMap();
+
+  React.useEffect(() => {
+    const strato = L.maplibreGL({ style: stile });
+    strato.addTo(mappa);
+
+    let caricata = false;
+    const libre = strato.getMaplibreMap();
+    libre.on('load', () => {
+      caricata = true;
+      nomiInItaliano(libre);
+      if (chiaro) aspettoTipoGoogle(libre);
+    });
+    libre.on('error', () => {
+      // Dopo il caricamento un errore riguarda una singola mattonella: la
+      // mappa resta usabile e non vale la pena cambiare sfondo.
+      if (!caricata) onErrore();
+    });
+
+    return () => {
+      strato.remove();
+    };
+  }, [mappa, stile, chiaro, onErrore]);
+
+  return null;
 }
 
 /** Converte la geometria GeoJSON ([lng,lat]) nell'ordine usato da Leaflet. */
@@ -131,6 +240,20 @@ function AdattaVista({ punti }: { punti: [number, number][] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `firma` rappresenta `punti`
   }, [firma, mappa]);
 
+  return null;
+}
+
+/** Attribuzione senza prefisso; lo stile vettoriale aggiunge da sé la sua. */
+function AttribuzioneCompatta({ testo }: { testo: string }) {
+  const mappa = useMap();
+  React.useEffect(() => {
+    const controllo = L.control.attribution({ prefix: false });
+    controllo.addTo(mappa);
+    if (testo) controllo.addAttribution(testo);
+    return () => {
+      controllo.remove();
+    };
+  }, [mappa, testo]);
   return null;
 }
 
@@ -196,6 +319,10 @@ export function MappaGiornata({ tappe, tratte, posizione, percorsoGuida, classNa
   const [segui, setSegui] = React.useState(true);
   const smettiDiSeguire = React.useCallback(() => {
     setSegui(false);
+  }, []);
+  const [vettorialeFallita, setVettorialeFallita] = React.useState(false);
+  const segnalaVettorialeFallita = React.useCallback(() => {
+    setVettorialeFallita(true);
   }, []);
 
   // Ogni nuova guida riparte centrata sulla posizione.
@@ -265,6 +392,7 @@ export function MappaGiornata({ tappe, tratte, posizione, percorsoGuida, classNa
   }
 
   const tile = configurazioneTile(resolvedTheme === 'dark');
+  const usaVettoriale = tile.stileVettoriale !== null && !vettorialeFallita;
 
   return (
     <div
@@ -272,7 +400,7 @@ export function MappaGiornata({ tappe, tratte, posizione, percorsoGuida, classNa
         'relative overflow-hidden rounded-xl border',
         // Il filtro agisce solo sulle mattonelle: marker e tracciato
         // restano dei loro colori (vedi index.css).
-        tile.filtraPerTemaScuro && 'mappa-tema-scuro',
+        !usaVettoriale && tile.filtraPerTemaScuro && 'mappa-tema-scuro',
         className,
       )}
     >
@@ -290,13 +418,27 @@ export function MappaGiornata({ tappe, tratte, posizione, percorsoGuida, classNa
           center={puntiPerInquadratura[0] ?? CENTRO_PREDEFINITO}
           zoom={13}
           scrollWheelZoom={false}
+          // Niente bandierina "Leaflet": l'attribuzione obbligatoria è quella
+          // dei dati, e su telefono ogni riga in basso copre la mappa.
+          attributionControl={false}
           className="h-full w-full"
           // Leaflet non è navigabile da tastiera in modo utile: il contenuto
           // informativo resta disponibile nell'elenco tappe accanto.
           aria-label="Mappa dell'itinerario"
         >
-          <TileLayer url={tile.url} attribution={tile.attribuzione} maxZoom={tile.maxZoom} />
+          {usaVettoriale && tile.stileVettoriale ? (
+            <SfondoVettoriale
+              stile={tile.stileVettoriale}
+              chiaro={resolvedTheme !== 'dark'}
+              onErrore={segnalaVettorialeFallita}
+            />
+          ) : (
+            <TileLayer url={tile.url} maxZoom={19} />
+          )}
 
+          <AttribuzioneCompatta
+            testo={usaVettoriale ? '' : tile.stileVettoriale ? ATTRIBUZIONE_OSM : tile.attribuzione}
+          />
           <SeguiDimensioni />
 
           {/* In guida l'inquadratura la decide la posizione, non il giro. */}
@@ -310,32 +452,58 @@ export function MappaGiornata({ tappe, tratte, posizione, percorsoGuida, classNa
             <AdattaVista punti={puntiPerInquadratura} />
           )}
 
-          {percorsi.map((percorso) => (
-            <Polyline
-              key={percorso.chiave}
-              positions={percorso.punti}
-              pathOptions={{
-                color: 'hsl(var(--primary))',
-                weight: 4,
-                // In guida il giro resta sullo sfondo: conta la strada da fare ora.
-                opacity: inGuida ? 0.35 : 0.85,
-                // Tratteggio per i percorsi stimati: si vede subito che non è
-                // un tracciato stradale reale.
-                dashArray: percorso.stimato ? '6 8' : undefined,
-              }}
-            />
-          ))}
+          {/* Due linee sovrapposte, una più larga e scura sotto: il bordo
+              stacca il percorso da qualunque strada, come su Google Maps.
+              In guida il giro diventa grigio: conta la strada da fare ora. */}
+          {percorsi.map((percorso) =>
+            percorso.stimato ? (
+              // Tratteggio per i percorsi stimati: si vede subito che non è
+              // un tracciato stradale reale.
+              <Polyline
+                key={percorso.chiave}
+                positions={percorso.punti}
+                pathOptions={{
+                  color: inGuida ? COLORI.percorsoSecondario : COLORI.percorso,
+                  weight: 5,
+                  opacity: 0.9,
+                  dashArray: '2 10',
+                  lineCap: 'round',
+                }}
+              />
+            ) : (
+              <React.Fragment key={percorso.chiave}>
+                <Polyline
+                  positions={percorso.punti}
+                  pathOptions={{
+                    color: inGuida ? '#80868b' : COLORI.bordoPercorso,
+                    weight: 8,
+                    opacity: inGuida ? 0.5 : 1,
+                    lineJoin: 'round',
+                  }}
+                />
+                <Polyline
+                  positions={percorso.punti}
+                  pathOptions={{
+                    color: inGuida ? COLORI.percorsoSecondario : COLORI.percorso,
+                    weight: 5,
+                    opacity: inGuida ? 0.6 : 1,
+                    lineJoin: 'round',
+                  }}
+                />
+              </React.Fragment>
+            ),
+          )}
 
           {inGuida ? (
             <>
-              {/* Bordo bianco sotto la linea: resta leggibile sopra qualunque strada. */}
+              {/* Strada da fare ora: più spessa del giro, sempre in primo piano. */}
               <Polyline
                 positions={percorsoGuida}
-                pathOptions={{ color: '#ffffff', weight: 9, opacity: 0.9 }}
+                pathOptions={{ color: COLORI.bordoPercorso, weight: 10, lineJoin: 'round' }}
               />
               <Polyline
                 positions={percorsoGuida}
-                pathOptions={{ color: BLU_GUIDA, weight: 6, opacity: 0.95 }}
+                pathOptions={{ color: COLORI.percorso, weight: 7, lineJoin: 'round' }}
               />
             </>
           ) : null}
@@ -348,8 +516,8 @@ export function MappaGiornata({ tappe, tratte, posizione, percorsoGuida, classNa
                 center={[posizione.lat, posizione.lng]}
                 radius={posizione.accuratezza}
                 pathOptions={{
-                  color: '#2563eb',
-                  fillColor: '#3b82f6',
+                  color: COLORI.posizione,
+                  fillColor: COLORI.posizione,
                   fillOpacity: 0.15,
                   weight: 1,
                 }}
@@ -358,6 +526,7 @@ export function MappaGiornata({ tappe, tratte, posizione, percorsoGuida, classNa
                 position={[posizione.lat, posizione.lng]}
                 icon={iconaPosizione()}
                 title="La tua posizione"
+                zIndexOffset={1000}
               />
             </>
           ) : null}

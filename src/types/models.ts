@@ -15,6 +15,7 @@ export type Profile = Tabella<'profiles'>;
 export type Itinerary = Tabella<'itineraries'>;
 export type Stop = Tabella<'stops'>;
 export type Leg = Tabella<'legs'>;
+export type PartenzaSalvata = Tabella<'saved_starts'>;
 
 export type ProfileUpdate = Aggiornamento<'profiles'>;
 export type ItineraryInsert = Inserimento<'itineraries'>;

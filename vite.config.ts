@@ -59,6 +59,17 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
+          {
+            // Mappa vettoriale OpenFreeMap: stili, caratteri, icone e
+            // mattonelle. Pesano poco e cambiano di rado.
+            urlPattern: /^https:\/\/tiles\.openfreemap\.org\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mappa-vettoriale',
+              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 14 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
         ],
         // Le chiamate a Supabase non vanno mai in cache: i dati devono essere
         // quelli veri, e le risposte dipendono dall'utente autenticato.

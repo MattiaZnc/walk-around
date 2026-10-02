@@ -48,3 +48,11 @@ describe('configurazioneTile con sorgente personalizzata', () => {
     vi.resetModules();
   });
 });
+
+describe('stileVettoriale', () => {
+  it('usa lo stile chiaro e quello scuro di OpenFreeMap', async () => {
+    const { stileVettoriale } = await import('@/features/itinerary/lib/tile-mappa');
+    expect(stileVettoriale(false)).toBe('https://tiles.openfreemap.org/styles/liberty');
+    expect(stileVettoriale(true)).toBe('https://tiles.openfreemap.org/styles/fiord');
+  });
+});

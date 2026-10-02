@@ -142,12 +142,20 @@
 }
 
 /* Attribuzione e controlli leggibili anche sul tema scuro */
-.dark .leaflet-control-attribution {
+/* Attribuzione discreta, come nelle app di mappe: resta leggibile ma non
+   ruba spazio alla mappa sul telefono. */
+.leaflet-container .leaflet-control-attribution {
+  font-size: 10px;
+  line-height: 1.4;
+  max-width: 75%;
+}
+
+.dark .leaflet-container .leaflet-control-attribution {
   background: hsl(var(--background) / 0.85);
   color: hsl(var(--muted-foreground));
 }
 
-.dark .leaflet-control-attribution a {
+.dark .leaflet-container .leaflet-control-attribution a {
   color: hsl(var(--primary));
 }
 

@@ -1,12 +1,20 @@
-import { Flag, Home, MapPinned } from 'lucide-react';
+import { Flag, Home, MapPin, MapPinned, Trash2 } from 'lucide-react';
 import * as React from 'react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import type { Luogo } from '@/features/itinerary/api/percorsi.api';
 import { RicercaLuogo } from '@/features/itinerary/components/ricerca-luogo';
+import {
+  useEliminaPartenza,
+  usePartenze,
+  useSalvaPartenza,
+} from '@/features/partenze/api/use-partenze';
+import { giaSalvata } from '@/features/partenze/lib/partenze';
 import type { PuntoDiPartenza } from '@/features/profile/api/use-profilo';
 import { dataLunga } from '@/lib/format';
 
@@ -48,14 +56,105 @@ export function SceltaPartenza({
 }: Props) {
   const [scelto, setScelto] = React.useState<Luogo | null>(null);
   const [nome, setNome] = React.useState('');
+  const [salva, setSalva] = React.useState(true);
 
-  const conferma = (partenza: PartenzaScelta) => {
+  const partenzeQuery = usePartenze();
+  const salvaPartenza = useSalvaPartenza();
+  const eliminaPartenza = useEliminaPartenza();
+  const salvate = partenzeQuery.data ?? [];
+
+  const conferma = (partenza: PartenzaScelta, daSalvare = false) => {
+    // Il salvataggio non blocca la giornata: se fallisce lo si dice, ma si
+    // parte lo stesso.
+    if (daSalvare && !giaSalvata(salvate, partenza)) {
+      salvaPartenza.mutate(partenza, {
+        onSuccess: (salvata) => {
+          toast.success(`"${salvata.label}" aggiunta alle tue partenze`);
+        },
+        onError: (errore) => {
+          toast.error('Partenza non salvata', { description: errore.message });
+        },
+      });
+    }
     onConferma(partenza);
   };
 
+  // L'indirizzo del profilo si propone solo se non è già fra le partenze
+  // salvate (l'aggiornamento del database lo copia lì come "Casa").
+  const mostraProfilo =
+    profilo !== null &&
+    !giaSalvata(salvate, {
+      label: profilo.indirizzo,
+      address: profilo.indirizzo,
+      lat: profilo.lat,
+      lng: profilo.lng,
+    }) &&
+    !salvate.some((salvata) => salvata.address === profilo.indirizzo);
+
+  const interruttoreSalva = (
+    <div className="flex items-center justify-between gap-3">
+      <Label htmlFor="salva-partenza" className="font-normal">
+        Salva tra le mie partenze
+      </Label>
+      <Switch id="salva-partenza" checked={salva} onCheckedChange={setSalva} />
+    </div>
+  );
+
   const contenuto = (
     <div className="space-y-5">
-      {profilo ? (
+      {salvate.length > 0 ? (
+        <section aria-labelledby="titolo-partenze" className="space-y-2">
+          <h3 id="titolo-partenze" className="text-sm font-medium">
+            Le tue partenze
+          </h3>
+          <ul className="space-y-2">
+            {salvate.map((salvata) => (
+              <li key={salvata.id} className="flex items-stretch gap-2">
+                <Button
+                  variant="outline"
+                  className="h-auto min-h-touch flex-1 justify-start gap-3 py-2 text-left"
+                  disabled={inCorso}
+                  onClick={() => {
+                    conferma({
+                      label: salvata.label,
+                      address: salvata.address,
+                      lat: salvata.lat,
+                      lng: salvata.lng,
+                    });
+                  }}
+                >
+                  <MapPin className="text-primary" aria-hidden />
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{salvata.label}</span>
+                    {salvata.address ? (
+                      <span className="block truncate text-xs font-normal text-muted-foreground">
+                        {salvata.address}
+                      </span>
+                    ) : null}
+                  </span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-auto text-muted-foreground hover:text-destructive"
+                  aria-label={`Elimina la partenza ${salvata.label}`}
+                  onClick={() => {
+                    eliminaPartenza.mutate(salvata.id, {
+                      onSuccess: () => {
+                        toast.info(`"${salvata.label}" tolta dalle tue partenze`);
+                      },
+                    });
+                  }}
+                >
+                  <Trash2 aria-hidden />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {mostraProfilo ? (
         <div className="space-y-2">
           <Button
             className="w-full justify-start gap-2 text-left"
@@ -79,6 +178,9 @@ export function SceltaPartenza({
       ) : null}
 
       <div className="space-y-3">
+        {salvate.length > 0 ? (
+          <p className="text-sm font-medium">Oppure parti da un altro posto</p>
+        ) : null}
         <RicercaLuogo
           vicinoA={
             profilo?.lat !== null && profilo?.lat !== undefined && profilo.lng !== null
@@ -113,17 +215,22 @@ export function SceltaPartenza({
               />
             </div>
 
+            {interruttoreSalva}
+
             <Button
               className="w-full"
               loading={inCorso}
               disabled={nome.trim() === ''}
               onClick={() => {
-                conferma({
-                  label: nome.trim() === '' ? scelto.nome : nome.trim(),
-                  address: scelto.indirizzo || scelto.etichetta,
-                  lat: scelto.lat,
-                  lng: scelto.lng,
-                });
+                conferma(
+                  {
+                    label: nome.trim() === '' ? scelto.nome : nome.trim(),
+                    address: scelto.indirizzo || scelto.etichetta,
+                    lat: scelto.lat,
+                    lng: scelto.lng,
+                  },
+                  salva,
+                );
               }}
             >
               <Flag aria-hidden />
@@ -149,13 +256,14 @@ export function SceltaPartenza({
               placeholder="Es. Casa"
             />
           </div>
+          {interruttoreSalva}
           <Button
             variant="outline"
             className="w-full"
             loading={inCorso}
             disabled={nome.trim() === ''}
             onClick={() => {
-              conferma({ label: nome.trim(), address: null, lat: null, lng: null });
+              conferma({ label: nome.trim(), address: null, lat: null, lng: null }, salva);
             }}
           >
             Usa questo nome, senza coordinate

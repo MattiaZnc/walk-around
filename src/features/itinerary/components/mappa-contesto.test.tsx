@@ -63,8 +63,19 @@ vi.mock('leaflet', () => ({
   default: {
     divIcon: (opzioni: unknown) => opzioni,
     latLngBounds: (punti: unknown) => punti,
+    control: {
+      attribution: () => ({
+        addTo: vi.fn(),
+        addAttribution: vi.fn(),
+        remove: vi.fn(),
+      }),
+    },
   },
 }));
+
+// Il collegamento a MapLibre estende Leaflet al caricamento: qui non serve,
+// jsdom non ha WebGL e la mappa usa le mattonelle.
+vi.mock('@maplibre/maplibre-gl-leaflet', () => ({}));
 
 const { MappaGiornata } = await import('@/features/itinerary/components/mappa-giornata');
 
